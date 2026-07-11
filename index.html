@@ -1,0 +1,1271 @@
+<!-- © 2026 James Eddison. All rights reserved. Unauthorised copying, modification, or distribution of this software is prohibited. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Calf Assistant</title>
+<link rel="icon" href="icon.png" type="image/png">
+<link rel="apple-touch-icon" href="icon.png">
+<meta name="theme-color" content="#33472F">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Calf Assistant">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F5F1E6;
+    --surface:#FFFFFF;
+    --ink:#2B2B23;
+    --ink-soft:#7A7464;
+    --forest:#33472F;
+    --forest-dark:#25331F;
+    --keeper:#4F7942;
+    --keeper-soft:#E4ECDF;
+    --bobby:#5C7A89;
+    --bobby-soft:#E3EAEC;
+    --hereford:#C1622D;
+    --hereford-soft:#F5E1D3;
+    --amber:#D98E2B;
+    --amber-soft:#FBEED9;
+    --danger:#B23A2E;
+    --danger-soft:#F5DFDA;
+    --line:#E2DCC9;
+    --radius:14px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:'Inter',system-ui,sans-serif;-webkit-tap-highlight-color:transparent;}
+  h1,h2,h3{font-family:'Fraunces',serif;font-weight:600;margin:0;}
+  .app{max-width:520px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;padding-bottom:78px;}
+
+  header.top{background:var(--forest);color:#F5F1E6;padding:18px 18px 16px;position:sticky;top:0;z-index:10;}
+  header.top .eyebrow{font-size:11px;letter-spacing:.14em;text-transform:uppercase;opacity:.65;margin-bottom:2px;}
+  header.top h1{font-size:22px;color:#fff;}
+  header.top .unit-toggle{position:absolute;right:16px;top:18px;display:flex;background:rgba(255,255,255,.12);border-radius:20px;padding:3px;}
+  header.top .unit-toggle button{border:none;background:transparent;color:#F5F1E6;font-size:12px;font-weight:600;padding:6px 10px;border-radius:16px;cursor:pointer;}
+  header.top .unit-toggle button.active{background:var(--amber);color:#2B2B23;}
+
+  main{flex:1;padding:16px;}
+  .screen{display:none;animation:fade .18s ease;}
+  .screen.active{display:block;}
+  @keyframes fade{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:translateY(0);}}
+
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin-bottom:14px;overflow:hidden;}
+  .card h2{font-size:16px;margin-bottom:10px;}
+  .muted{color:var(--ink-soft);font-size:13px;}
+
+  /* Today screen */
+  .mob-card{border-radius:var(--radius);padding:16px;margin-bottom:12px;position:relative;overflow:hidden;}
+  .mob-card.keeper{background:var(--keeper-soft);}
+  .mob-card.bobby{background:var(--bobby-soft);}
+  .mob-card.hereford{background:var(--hereford-soft);}
+  .mob-card .label{font-size:12px;text-transform:uppercase;letter-spacing:.08em;font-weight:700;opacity:.75;}
+  .mob-card .amount{font-family:'Fraunces',serif;font-size:32px;font-weight:600;margin-top:2px;}
+  .mob-card .sub{font-size:12px;color:var(--ink-soft);margin-top:2px;}
+  .curve{display:flex;gap:2px;margin-top:10px;height:20px;align-items:flex-end;}
+  .curve i{flex:1;background:currentColor;opacity:.25;border-radius:2px 2px 0 0;}
+  .curve i.now{opacity:.9;}
+  .shed-row{display:flex;justify-content:space-between;font-size:13px;padding:6px 0;border-top:1px dashed rgba(0,0,0,.08);}
+  .shed-row:first-of-type{border-top:none;margin-top:8px;}
+  .grand-total{display:flex;justify-content:space-between;align-items:baseline;background:var(--forest);color:#fff;border-radius:var(--radius);padding:16px;margin-top:4px;}
+  .grand-total .amount{font-family:'Fraunces',serif;font-size:26px;}
+
+  /* Buttons */
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:none;border-radius:10px;padding:12px 16px;font-size:14px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer;}
+  .btn-primary{background:var(--forest);color:#fff;width:100%;}
+  .btn-amber{background:var(--amber);color:#2B2B23;width:100%;}
+  .btn-outline{background:transparent;border:1px solid var(--line);color:var(--ink);}
+  .btn-danger{background:var(--danger-soft);color:var(--danger);}
+  .btn-sm{padding:8px 12px;font-size:12px;border-radius:8px;}
+  .btn:disabled{opacity:.4;}
+  .btn-row{display:flex;gap:8px;flex-wrap:wrap;}
+
+  .type-picker{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;}
+  .type-picker button{padding:16px 6px;border-radius:12px;border:2px solid var(--line);background:#fff;font-family:'Fraunces',serif;font-weight:600;font-size:14px;cursor:pointer;color:var(--ink);}
+  .type-picker button.keeper.selected{border-color:var(--keeper);background:var(--keeper-soft);}
+  .type-picker button.bobby.selected{border-color:var(--bobby);background:var(--bobby-soft);}
+  .type-picker button.hereford.selected{border-color:var(--hereford);background:var(--hereford-soft);}
+
+  input[type=number],input[type=text],input[type=date],select,textarea{width:100%;padding:11px 12px;border-radius:10px;border:1px solid var(--line);font-size:15px;font-family:'Inter',sans-serif;background:#fff;color:var(--ink);box-sizing:border-box;min-width:0;}
+  input[type=date]{-webkit-appearance:none;appearance:none;}
+  label{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-soft);font-weight:600;display:block;margin-bottom:6px;margin-top:12px;}
+  label:first-child{margin-top:0;}
+
+  .farm-picker{display:flex;gap:8px;}
+  .farm-picker button{flex:1;padding:12px;border-radius:10px;border:2px solid var(--line);background:#fff;font-weight:700;cursor:pointer;}
+  .farm-picker button.selected{border-color:var(--forest);background:var(--forest);color:#fff;}
+
+  .tag-grid{display:flex;flex-wrap:wrap;gap:6px;max-height:220px;overflow-y:auto;padding:10px;border:1px solid var(--line);border-radius:10px;background:#FCFAF4;margin-top:6px;}
+  .tag-chip{padding:7px 10px;border-radius:8px;border:1px solid var(--line);background:#fff;font-size:13px;font-weight:600;cursor:pointer;}
+  .tag-chip.selected{background:var(--keeper);border-color:var(--keeper);color:#fff;}
+  .tag-chip.used{opacity:.3;pointer-events:none;text-decoration:line-through;}
+
+  .shed-picker{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+  .shed-picker button{padding:10px 4px;border-radius:10px;border:2px solid var(--line);background:#fff;font-weight:700;font-size:12px;line-height:1.25;cursor:pointer;white-space:normal;}
+  .shed-picker button.selected{border-color:var(--keeper);background:var(--keeper-soft);}
+
+  .list-item{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--line);font-size:14px;}
+  .list-item:last-child{border-bottom:none;}
+  .list-item .meta{color:var(--ink-soft);font-size:12px;}
+  .pill{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;}
+  .pill.keeper{background:var(--keeper-soft);color:var(--keeper);}
+  .pill.bobby{background:var(--bobby-soft);color:var(--bobby);}
+  .pill.hereford{background:var(--hereford-soft);color:var(--hereford);}
+
+  .empty{text-align:center;padding:30px 10px;color:var(--ink-soft);font-size:14px;}
+
+  .treat-card{border-left:4px solid var(--amber);background:var(--amber-soft);border-radius:10px;padding:12px 14px;margin-bottom:10px;}
+  .treat-card .top-row{display:flex;justify-content:space-between;align-items:baseline;}
+  .treat-card h3{font-size:15px;}
+  .treat-card .day-count{font-size:12px;font-weight:700;color:var(--forest);}
+  .tag-list{display:flex;flex-wrap:wrap;gap:5px;margin:8px 0;}
+  .tag-list span{background:#fff;border:1px solid var(--line);border-radius:6px;padding:3px 7px;font-size:12px;font-weight:600;}
+  .tag-list span button{border:none;background:none;color:var(--danger);cursor:pointer;font-weight:700;margin-left:4px;padding:0;}
+
+  nav.bottom{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--line);display:flex;max-width:520px;margin:0 auto;z-index:20;}
+  nav.bottom button{flex:1;background:none;border:none;padding:8px 1px 10px;font-size:9.5px;font-weight:600;color:var(--ink-soft);cursor:pointer;font-family:'Inter',sans-serif;border-top:2px solid transparent;letter-spacing:0;}
+  nav.bottom button.active{color:var(--forest);border-top:2px solid var(--forest);}
+
+  .toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--forest-dark);color:#fff;padding:10px 18px;border-radius:20px;font-size:13px;font-weight:600;z-index:50;opacity:0;pointer-events:none;transition:opacity .2s;}
+  .toast.show{opacity:1;}
+
+  .section-toggle{display:flex;justify-content:space-between;align-items:center;cursor:pointer;}
+  .section-toggle .chev{transition:transform .15s;}
+  .section-toggle.open .chev{transform:rotate(180deg);}
+  .collapsible{max-height:0;overflow:hidden;transition:max-height .2s ease;}
+  .collapsible.open{max-height:2000px;}
+
+  textarea{min-height:70px;resize:vertical;}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="eyebrow" id="headerEyebrow">Calf Assistant</div>
+    <h1 id="headerTitle">Today</h1>
+    <div class="unit-toggle">
+      <button id="unitL" class="active" onclick="setUnit('L')">L</button>
+      <button id="unitKg" onclick="setUnit('kg')">kg</button>
+    </div>
+    <div style="position:absolute;right:16px;top:46px;font-size:9px;opacity:.55;text-transform:uppercase;letter-spacing:.05em;">keepers only</div>
+  </header>
+
+  <main>
+    <!-- TODAY -->
+    <section class="screen active" id="screen-today"></section>
+
+    <!-- BIRTHS -->
+    <section class="screen" id="screen-births"></section>
+
+    <!-- TREATMENTS -->
+    <section class="screen" id="screen-treatments"></section>
+
+    <!-- DEATHS -->
+    <section class="screen" id="screen-deaths"></section>
+
+    <!-- LOOKUP -->
+    <section class="screen" id="screen-lookup"></section>
+
+    <!-- BOBBIES -->
+    <section class="screen" id="screen-bobbies"></section>
+
+    <!-- PUSH -->
+    <section class="screen" id="screen-push"></section>
+
+    <!-- SHARE -->
+    <section class="screen" id="screen-share"></section>
+  </main>
+
+  <nav class="bottom">
+    <button data-screen="today" class="active" onclick="showScreen('today')">Today</button>
+    <button data-screen="births" onclick="showScreen('births')">Births</button>
+    <button data-screen="bobbies" onclick="showScreen('bobbies')">Bobbies</button>
+    <button data-screen="push" onclick="showScreen('push')">Push</button>
+    <button data-screen="treatments" onclick="showScreen('treatments')">Treatments</button>
+    <button data-screen="deaths" onclick="showScreen('deaths')">Deaths</button>
+    <button data-screen="lookup" onclick="showScreen('lookup')">Lookup</button>
+    <button data-screen="share" onclick="showScreen('share')">Share</button>
+  </nav>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============ CONFIG ============
+   Adjust these as feeding plans get confirmed (e.g. Hereford weaning length,
+   keeper weaning decline). Everything else reads from here. */
+const CONFIG = {
+  keeper:  { rampStartL: 2, rampEndL: 7, rampDays: 8, weanDay: 58 }, // age(days) 1..8 ramps 2->7, flat at 7 until weanDay
+  bobby:   { day0L: 2, fullL: 4, overdueDays: 5 },                   // fed until Cleared or moved to Hereford mob — no hard cutoff. overdueDays just flags the pen.
+  hereford:{ fullL: 7 },                                            // flat rate once moved into the mob (day after the move — they've already been fed that morning)
+  gramsPerLitre: 150,
+  tagPools: { D1: {min:1, max:350}, D2: {min:5001, max:5350} },
+  sheds: [1,2,3,4],
+  shedNames: { 1: 'D2 Big Shed', 2: 'D2 Long Shed', 3: 'D1 Long Shed', 4: 'D1 Big Shed' },
+  bobbyPens: [1,2,3,4,5,6,7,8],
+  bobbyFarms: { D1: 'D1', D2: 'D2', HF: 'Hereford' }
+};
+function shedName(s){ return CONFIG.shedNames[s] || ('Shed '+s); }
+
+/* ============ STORAGE ============ */
+const STORE_KEY = 'calfAssistantData';
+function loadData(){
+  try{
+    const raw = localStorage.getItem(STORE_KEY);
+    if(raw) return JSON.parse(raw);
+  }catch(e){}
+  return { calves: [], treatments: [], deaths: [], pushList: [], lastShed: 1, lastBobbyPen: 1, unit: 'L' };
+}
+let DATA = loadData();
+if(!DATA.pushList) DATA.pushList = [];
+function save(){ localStorage.setItem(STORE_KEY, JSON.stringify(DATA)); }
+
+/* ============ HELPERS ============ */
+function todayStr(){ return new Date().toISOString().slice(0,10); }
+function ageInDays(birthDateStr, onDate){
+  const d0 = new Date(birthDateStr+'T00:00:00');
+  const d1 = new Date((onDate||todayStr())+'T00:00:00');
+  return Math.round((d1-d0)/86400000);
+}
+function fmtDate(d){
+  const dt = new Date(d+'T00:00:00');
+  return dt.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+}
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(()=>t.classList.remove('show'), 1800);
+}
+
+/* ============ FEED CALCULATIONS ============ */
+function litresForCalf(calf, onDate){
+  const today = onDate || todayStr();
+  if(calf.type === 'keeper'){
+    const age = ageInDays(calf.birthDate, today);
+    if(age < 0) return 0;
+    if(age === 0) return 0; // colostrum day, excluded from forecast
+    if(age > CONFIG.keeper.weanDay) return 0; // weaned off
+    if(age <= CONFIG.keeper.rampDays){
+      const step = (CONFIG.keeper.rampEndL - CONFIG.keeper.rampStartL) / (CONFIG.keeper.rampDays - 1);
+      return CONFIG.keeper.rampStartL + (age-1)*step;
+    }
+    return CONFIG.keeper.rampEndL;
+  }
+  if(calf.type === 'bobby'){
+    // Genuine D1/D2 bobbies and Hereford-origin calves alike — fed until Cleared
+    // or moved to the Hereford mob, however many days that takes. No auto cutoff.
+    const age = ageInDays(calf.birthDate, today);
+    if(age < 0) return 0;
+    return age === 0 ? CONFIG.bobby.day0L : CONFIG.bobby.fullL;
+  }
+  if(calf.type === 'hereford'){
+    // moveDate is when it was pulled from the bobby pens into the mob.
+    // Same-day rule as keepers: already fed as a bobby that morning, so the
+    // flat 7L rate only starts the day after the move.
+    const moveAge = ageInDays(calf.moveDate, today);
+    if(moveAge < 0) return 0;
+    if(moveAge === 0) return CONFIG.bobby.fullL;
+    return CONFIG.hereford.fullL;
+  }
+  return 0;
+}
+function litresToDisplay(l){
+  if(DATA.unit === 'kg') return (l*CONFIG.gramsPerLitre/1000);
+  return l;
+}
+function fmtKeeper(l){
+  // Keepers are on milk replacer powder — this is the only group the L/kg toggle applies to
+  const v = litresToDisplay(l);
+  return v.toFixed(1) + (DATA.unit==='kg' ? ' kg' : ' L');
+}
+function fmtLitres(l){
+  // Bobbies and Herefords are whole milk only — always litres, toggle doesn't apply
+  return l.toFixed(1) + ' L';
+}
+
+/* ============ TAG POOLS ============ */
+function availableTags(farm){
+  const pool = CONFIG.tagPools[farm];
+  const used = new Set(DATA.calves.filter(c=>c.type==='keeper' && c.farm===farm).map(c=>c.tag));
+  const out = [];
+  for(let t=pool.min; t<=pool.max; t++){ if(!used.has(t)) out.push(t); }
+  return out;
+}
+
+/* ============ UNIT TOGGLE ============ */
+function setUnit(u){
+  DATA.unit = u; save();
+  document.getElementById('unitL').classList.toggle('active', u==='L');
+  document.getElementById('unitKg').classList.toggle('active', u==='kg');
+  renderAll();
+}
+
+/* ============ NAV ============ */
+function showScreen(name){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById('screen-'+name).classList.add('active');
+  document.querySelectorAll('nav.bottom button').forEach(b=>b.classList.toggle('active', b.dataset.screen===name));
+  const titles = {today:['Calf Assistant',"Today"], births:['Log a Birth','Record New Calves'], bobbies:['Pens','Bobby Pens'], push:['Keepers','Pushing List'], treatments:['Health Register','Treatments'], deaths:['Records','Death Register'], lookup:['Records','Tag Lookup'], share:['Records','Share & Backup']};
+  document.getElementById('headerEyebrow').textContent = titles[name][0];
+  document.getElementById('headerTitle').textContent = titles[name][1];
+  renderAll();
+}
+
+/* ============ RENDER: TODAY ============ */
+let todayFeedOpen = false;
+function toggleTodayFeed(){ todayFeedOpen = !todayFeedOpen; renderToday(); }
+
+function renderToday(){
+  const el = document.getElementById('screen-today');
+  const today = todayStr();
+  const bobbies = DATA.calves.filter(c=>c.type==='bobby' && (!c.cleared || c.clearedDate===today) && ageInDays(c.birthDate,today) >= 0);
+  const herefords = DATA.calves.filter(c=>c.type==='hereford' && ageInDays(c.moveDate,today) >= 0);
+  const keepers = DATA.calves.filter(c=>c.type==='keeper' && ageInDays(c.birthDate,today) >= 0 && ageInDays(c.birthDate,today) <= CONFIG.keeper.weanDay);
+
+  const bobbyTotal = bobbies.reduce((s,c)=>s+litresForCalf(c,today),0);
+  const herefordTotal = herefords.reduce((s,c)=>s+litresForCalf(c,today),0);
+  const keeperTotal = keepers.reduce((s,c)=>s+litresForCalf(c,today),0);
+  const grandTotal = bobbyTotal+herefordTotal+keeperTotal;
+
+  let shedRows = '';
+  CONFIG.sheds.forEach(s=>{
+    const shedCalves = keepers.filter(c=>c.shed===s);
+    const shedTotal = shedCalves.reduce((sum,c)=>sum+litresForCalf(c,today),0);
+    shedRows += `<div class="shed-row"><span>${shedName(s)} · ${shedCalves.length} head</span><strong>${fmtKeeper(shedTotal)}</strong></div>`;
+  });
+
+  const bobbyD1 = bobbies.filter(c=>c.farm==='D1').length;
+  const bobbyD2 = bobbies.filter(c=>c.farm==='D2').length;
+  const bobbyHF = bobbies.filter(c=>c.farm==='HF').length;
+  const overdueCount = bobbies.filter(c=>ageInDays(c.birthDate,today) >= CONFIG.bobby.overdueDays).length;
+
+  // Herd summary (always visible)
+  const keepersD1 = keepers.filter(c=>c.farm==='D1').length;
+  const keepersD2 = keepers.filter(c=>c.farm==='D2').length;
+  const deathsTotal = DATA.deaths.length;
+  const day4D1 = bobbies.filter(c=>c.farm==='D1' && ageInDays(c.birthDate,today)===4).length;
+  const day4D2 = bobbies.filter(c=>c.farm==='D2' && ageInDays(c.birthDate,today)===4).length;
+  const day5D1 = bobbies.filter(c=>c.farm==='D1' && ageInDays(c.birthDate,today)===5).length;
+  const day5D2 = bobbies.filter(c=>c.farm==='D2' && ageInDays(c.birthDate,today)===5).length;
+
+  el.innerHTML = `
+    <div class="card">
+      <h2>Keepers</h2>
+      <div class="shed-row"><span>D1</span><strong>${keepersD1}</strong></div>
+      <div class="shed-row"><span>D2</span><strong>${keepersD2}</strong></div>
+      <div class="shed-row" style="font-weight:700;border-top:1px solid var(--line);"><span>Total</span><strong>${keepersD1+keepersD2}</strong></div>
+    </div>
+
+    <div class="card">
+      <h2>Bobbies</h2>
+      <div class="shed-row"><span>D1</span><strong>${bobbyD1}</strong></div>
+      <div class="shed-row"><span>D2</span><strong>${bobbyD2}</strong></div>
+      <div class="muted" style="margin-top:12px;font-weight:700;">Day 4</div>
+      <div class="shed-row"><span>D1</span><strong>${day4D1}</strong></div>
+      <div class="shed-row"><span>D2</span><strong>${day4D2}</strong></div>
+      <div class="muted" style="margin-top:12px;font-weight:700;">Day 5</div>
+      <div class="shed-row"><span>D1</span><strong>${day5D1}</strong></div>
+      <div class="shed-row"><span>D2</span><strong>${day5D2}</strong></div>
+    </div>
+
+    <div class="card">
+      <h2>Deaths this season</h2>
+      <div style="font-family:'Fraunces',serif;font-size:28px;font-weight:600;margin-top:4px;">${deathsTotal}</div>
+    </div>
+
+    <div class="card">
+      <div class="section-toggle ${todayFeedOpen?'open':''}" onclick="toggleTodayFeed()">
+        <h2>Today's feed${todayFeedOpen ? '' : ' — '+fmtLitres(grandTotal)}</h2>
+        <span class="chev">▾</span>
+      </div>
+      <div class="collapsible ${todayFeedOpen?'open':''}" style="${todayFeedOpen?'margin-top:14px;':''}">
+        <div class="mob-card keeper">
+          <div class="label">Keepers · ${keepers.length} head</div>
+          <div class="amount">${fmtKeeper(keeperTotal)}</div>
+          <div class="sub">Rising plane: ${CONFIG.keeper.rampStartL}L on day 1 → ${CONFIG.keeper.rampEndL}L by day ${CONFIG.keeper.rampDays} · powder or milk</div>
+          ${shedRows}
+        </div>
+        <div class="mob-card bobby">
+          <div class="label">Bobbies · ${bobbies.length} head</div>
+          <div class="amount">${fmtLitres(bobbyTotal)}</div>
+          <div class="sub">${CONFIG.bobby.day0L}L day 1, then ${CONFIG.bobby.fullL}L/day until cleared or moved to Herefords · milk only</div>
+          <div class="shed-row"><span>D1: ${bobbyD1} · D2: ${bobbyD2} · Hereford: ${bobbyHF}</span>${overdueCount>0?`<strong style="color:var(--danger);">${overdueCount} overdue</strong>`:''}</div>
+        </div>
+        <div class="mob-card hereford">
+          <div class="label">Hereford mob · ${herefords.length} head</div>
+          <div class="amount">${fmtLitres(herefordTotal)}</div>
+          <div class="sub">Flat ${CONFIG.hereford.fullL}L/day from the day after they're moved from the bobby pens · milk only</div>
+        </div>
+        <div class="grand-total">
+          <span>Total today (litres)</span>
+          <span class="amount">${fmtLitres(grandTotal)}</span>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+/* ============ RENDER: BIRTHS ============ */
+let birthState = { type:null, farm:null, selectedTags:new Set(), shed:null, pen:null, date: todayStr() };
+
+function renderBirths(){
+  const el = document.getElementById('screen-births');
+  const recent = DATA.calves.filter(c=>c.birthDate===birthState.date).slice(-30).reverse();
+
+  let recentHtml = recent.length ? recent.map(c=>`
+    <div class="list-item">
+      <span><span class="pill ${c.type}">${c.type}</span> ${c.tag ? '#'+c.tag+' · ' : ''}${c.farm ? (CONFIG.bobbyFarms[c.farm]||c.farm) : ''} ${c.shed?('· '+shedName(c.shed)):''}${c.pen?('· Pen '+c.pen):''}</span>
+      <button class="btn btn-sm btn-danger" onclick="undoCalf('${c.id}')">Remove</button>
+    </div>
+  `).join('') : '<div class="empty">No calves logged for this date yet.</div>';
+
+  el.innerHTML = `
+    <div class="card">
+      <label>Date</label>
+      <input type="date" id="birthDate" value="${birthState.date}" onchange="birthState.date=this.value; renderBirths();">
+
+      <label>Type</label>
+      <div class="type-picker">
+        <button class="keeper ${birthState.type==='keeper'?'selected':''}" onclick="pickType('keeper')">Keeper</button>
+        <button class="bobby ${birthState.type==='bobby'?'selected':''}" onclick="pickType('bobby')">Bobby</button>
+      </div>
+
+      <div id="birthFormBody"></div>
+    </div>
+
+    <div class="card">
+      <h2>Logged on ${fmtDate(birthState.date)}</h2>
+      ${recentHtml}
+    </div>
+  `;
+  renderBirthFormBody();
+}
+
+function pickType(t){
+  birthState.type = t;
+  birthState.farm = null;
+  birthState.pen = null;
+  birthState.selectedTags = new Set();
+  renderBirths();
+}
+
+function renderBirthFormBody(){
+  const body = document.getElementById('birthFormBody');
+  if(!body) return;
+  if(!birthState.type){ body.innerHTML=''; return; }
+
+  if(birthState.type === 'bobby'){
+    let html = `<label>Farm</label>
+      <div class="farm-picker">
+        <button class="${birthState.farm==='D1'?'selected':''}" onclick="pickFarm('D1')">D1</button>
+        <button class="${birthState.farm==='D2'?'selected':''}" onclick="pickFarm('D2')">D2</button>
+        <button class="${birthState.farm==='HF'?'selected':''}" onclick="pickFarm('HF')">Hereford</button>
+      </div>`;
+    if(birthState.farm){
+      html += `<label>How many born?</label>
+        <input type="number" id="countInput" min="1" placeholder="e.g. 8">
+        <label>Pen</label>
+        <div class="shed-picker">
+          ${CONFIG.bobbyPens.map(p=>`<button class="${(birthState.pen||DATA.lastBobbyPen)===p?'selected':''}" onclick="pickBobbyPen(${p})">Pen ${p}</button>`).join('')}
+        </div>
+        <div style="margin-top:14px;">
+          <button class="btn btn-primary" onclick="saveBobby()">Save Bobbies</button>
+        </div>`;
+    }
+    body.innerHTML = html;
+    return;
+  }
+
+  // Keeper flow
+  let html = `<label>Farm</label>
+    <div class="farm-picker">
+      <button class="${birthState.farm==='D1'?'selected':''}" onclick="pickFarm('D1')">D1 (1–350)</button>
+      <button class="${birthState.farm==='D2'?'selected':''}" onclick="pickFarm('D2')">D2 (5001–5350)</button>
+    </div>`;
+
+  if(birthState.farm){
+    const avail = availableTags(birthState.farm);
+    html += `<label>Tap tag numbers (${birthState.selectedTags.size} selected)</label>
+      <div class="tag-grid">
+        ${avail.length ? avail.map(t=>`<div class="tag-chip ${birthState.selectedTags.has(t)?'selected':''}" onclick="toggleTag(${t})">${t}</div>`).join('') : '<div class="empty">No tags left in this pool.</div>'}
+      </div>`;
+
+    html += `<label>Shed</label>
+      <div class="shed-picker">
+        ${CONFIG.sheds.map(s=>`<button class="${(birthState.shed||DATA.lastShed)===s?'selected':''}" onclick="pickShed(${s})">${shedName(s)}</button>`).join('')}
+      </div>`;
+
+    html += `<div style="margin-top:14px;">
+      <button class="btn btn-primary" onclick="saveKeepers()" ${birthState.selectedTags.size===0?'disabled':''}>Save ${birthState.selectedTags.size||''} Keeper${birthState.selectedTags.size===1?'':'s'}</button>
+    </div>`;
+  }
+  body.innerHTML = html;
+}
+
+function pickFarm(f){ birthState.farm=f; birthState.selectedTags=new Set(); renderBirthFormBody(); }
+function toggleTag(t){
+  if(birthState.selectedTags.has(t)) birthState.selectedTags.delete(t);
+  else birthState.selectedTags.add(t);
+  renderBirthFormBody();
+}
+function pickShed(s){ birthState.shed = s; renderBirthFormBody(); }
+function pickBobbyPen(p){ birthState.pen = p; renderBirthFormBody(); }
+
+function saveBobby(){
+  const n = parseInt(document.getElementById('countInput').value, 10);
+  if(!n || n<1){ toast('Enter a number first'); return; }
+  if(!birthState.farm){ toast('Pick a farm first'); return; }
+  const pen = birthState.pen || DATA.lastBobbyPen;
+  for(let i=0;i<n;i++){
+    DATA.calves.push({ id: uid(), type:'bobby', farm: birthState.farm, tag:null, shed:null, pen: pen, cleared:false, birthDate: birthState.date });
+  }
+  DATA.lastBobbyPen = pen;
+  save();
+  toast(`${n} bobbies logged to Pen ${pen}`);
+  birthState.type = null; birthState.farm = null; birthState.pen = null;
+  renderBirths();
+}
+
+function saveKeepers(){
+  if(birthState.selectedTags.size===0) return;
+  const shed = birthState.shed || DATA.lastShed;
+  birthState.selectedTags.forEach(t=>{
+    DATA.calves.push({ id: uid(), type:'keeper', farm: birthState.farm, tag: t, shed: shed, birthDate: birthState.date });
+  });
+  DATA.lastShed = shed;
+  save();
+  toast(`${birthState.selectedTags.size} keeper(s) added to Shed ${shed}`);
+  birthState.selectedTags = new Set();
+  renderBirths();
+}
+
+function undoCalf(id){
+  DATA.calves = DATA.calves.filter(c=>c.id!==id);
+  save();
+  renderBirths();
+}
+
+/* ============ RENDER: TREATMENTS ============ */
+let treatFormOpen = false;
+function renderTreatments(){
+  const el = document.getElementById('screen-treatments');
+  const today = todayStr();
+  const active = DATA.treatments.filter(t=>{
+    const start = new Date(t.startDate+'T00:00:00');
+    const end = new Date(start.getTime() + (t.days-1)*86400000);
+    const now = new Date(today+'T00:00:00');
+    return now >= start && now <= end && t.tags.length>0;
+  });
+  const upcoming = DATA.treatments.filter(t=> new Date(t.startDate+'T00:00:00') > new Date(today+'T00:00:00') && t.tags.length>0);
+  const past = DATA.treatments.filter(t=>{
+    const start = new Date(t.startDate+'T00:00:00');
+    const end = new Date(start.getTime() + (t.days-1)*86400000);
+    return end < new Date(today+'T00:00:00') || t.tags.length===0;
+  });
+
+  function dayLabel(t){
+    const d = ageInDays(t.startDate) + 1;
+    return `Day ${Math.max(d,0)} of ${t.days}`;
+  }
+  function treatCard(t){
+    return `
+      <div class="treat-card">
+        <div class="top-row">
+          <h3>${t.treatmentType}</h3>
+          <span class="day-count">${dayLabel(t)}</span>
+        </div>
+        <div class="tag-list">
+          ${t.tags.map(tag=>`<span>#${tag} <button onclick="removeTagFromTreatment('${t.id}','${tag}')">×</button></span>`).join('')}
+        </div>
+        ${t.notes?`<div class="muted">${t.notes}</div>`:''}
+        <div class="btn-row" style="margin-top:8px;">
+          <button class="btn btn-sm btn-outline" onclick="addTagsToTreatment('${t.id}')">+ Add calves</button>
+          <button class="btn btn-sm btn-danger" onclick="cancelTreatment('${t.id}')">Cancel treatment</button>
+        </div>
+      </div>`;
+  }
+
+  el.innerHTML = `
+    <div class="card">
+      <div class="section-toggle ${treatFormOpen?'open':''}" onclick="toggleTreatForm()">
+        <h2>Log a new treatment</h2>
+        <span class="chev">▾</span>
+      </div>
+      <div class="collapsible ${treatFormOpen?'open':''}">
+        <label>Treatment type</label>
+        <input type="text" id="treatType" placeholder="e.g. Scours, Pneumonia, Navel ill">
+        <label>Calf tag numbers</label>
+        <input type="text" id="treatTags" placeholder="e.g. 12, 45, 108">
+        <label>Start date</label>
+        <input type="date" id="treatStart" value="${today}">
+        <label>Duration (days)</label>
+        <input type="number" id="treatDays" min="1" value="3">
+        <label>Notes (optional)</label>
+        <textarea id="treatNotes" placeholder="Dosage, drug used, anything worth flagging"></textarea>
+        <div style="margin-top:14px;">
+          <button class="btn btn-primary" onclick="saveTreatment()">Save treatment</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Due today (${active.length})</h2>
+      ${active.length ? active.map(treatCard).join('') : '<div class="empty">No treatments due today.</div>'}
+    </div>
+
+    ${upcoming.length ? `<div class="card"><h2>Upcoming</h2>${upcoming.map(treatCard).join('')}</div>` : ''}
+    ${past.length ? `<div class="card"><h2>Past</h2>${past.slice(-15).reverse().map(t=>`
+      <div class="list-item"><span>${t.treatmentType} — ${t.tags.length} calf/calves</span><span class="meta">${fmtDate(t.startDate)}</span></div>
+    `).join('')}</div>` : ''}
+  `;
+}
+function toggleTreatForm(){ treatFormOpen = !treatFormOpen; renderTreatments(); }
+
+function saveTreatment(){
+  const type = document.getElementById('treatType').value.trim();
+  const tagsRaw = document.getElementById('treatTags').value.trim();
+  const start = document.getElementById('treatStart').value;
+  const days = parseInt(document.getElementById('treatDays').value,10);
+  const notes = document.getElementById('treatNotes').value.trim();
+  if(!type || !tagsRaw || !days){ toast('Fill in type, tags and duration'); return; }
+  const tags = tagsRaw.split(/[,\s]+/).filter(Boolean);
+  DATA.treatments.push({ id: uid(), treatmentType:type, tags, startDate:start, days, notes });
+  save();
+  toast(`Treatment logged for ${tags.length} calf/calves`);
+  treatFormOpen = false;
+  renderTreatments();
+}
+function removeTagFromTreatment(id, tag){
+  const t = DATA.treatments.find(x=>x.id===id);
+  if(!t) return;
+  t.tags = t.tags.filter(x=>x!==tag);
+  save(); renderTreatments();
+}
+function addTagsToTreatment(id){
+  const more = prompt('Add tag numbers (comma or space separated):');
+  if(!more) return;
+  const t = DATA.treatments.find(x=>x.id===id);
+  if(!t) return;
+  const newTags = more.split(/[,\s]+/).filter(Boolean);
+  t.tags = [...new Set([...t.tags, ...newTags])];
+  save(); renderTreatments();
+}
+function cancelTreatment(id){
+  if(!confirm('Cancel this whole treatment?')) return;
+  DATA.treatments = DATA.treatments.filter(x=>x.id!==id);
+  save(); renderTreatments();
+}
+
+/* ============ RENDER: DEATHS ============ */
+function renderDeaths(){
+  const el = document.getElementById('screen-deaths');
+  const list = [...DATA.deaths].reverse();
+  el.innerHTML = `
+    <div class="card">
+      <h2>Record a death</h2>
+      <label>Calf tag number</label>
+      <input type="text" id="deathTag" placeholder="e.g. 214 or 5087">
+      <label>Date of death</label>
+      <input type="date" id="deathDate" value="${todayStr()}">
+      <label>Reason</label>
+      <input type="text" id="deathReason" placeholder="e.g. Scours, found dead, unknown">
+      <div style="margin-top:14px;">
+        <button class="btn btn-primary" onclick="saveDeath()">Save record</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Death register (${DATA.deaths.length})</h2>
+      ${list.length ? list.map(d=>`
+        <div class="list-item">
+          <span>#${d.tag} — ${d.reason}</span>
+          <span class="meta">${fmtDate(d.date)}</span>
+        </div>
+      `).join('') : '<div class="empty">No deaths recorded.</div>'}
+    </div>
+  `;
+}
+function saveDeath(){
+  const tag = document.getElementById('deathTag').value.trim();
+  const date = document.getElementById('deathDate').value;
+  const reason = document.getElementById('deathReason').value.trim();
+  if(!tag || !reason){ toast('Enter a tag and reason'); return; }
+  DATA.deaths.push({ tag, date, reason });
+  save();
+  toast('Death recorded');
+  renderDeaths();
+}
+
+/* ============ RENDER: LOOKUP ============ */
+function renderLookup(){
+  const el = document.getElementById('screen-lookup');
+  el.innerHTML = `
+    <div class="card">
+      <h2>Find a calf by tag</h2>
+      <input type="text" id="lookupInput" placeholder="Enter tag number" oninput="doLookup()">
+      <div id="lookupResult" style="margin-top:14px;"></div>
+    </div>
+  `;
+}
+function doLookup(){
+  const val = document.getElementById('lookupInput').value.trim();
+  const resultEl = document.getElementById('lookupResult');
+  if(!val){ resultEl.innerHTML=''; return; }
+  const calf = DATA.calves.find(c => String(c.tag) === val);
+  if(!calf){ resultEl.innerHTML = '<div class="empty">No keeper found with that tag.</div>'; return; }
+  const age = ageInDays(calf.birthDate);
+  const today = fmtKeeper(litresForCalf(calf));
+  const deaths = DATA.deaths.filter(d=>d.tag===val);
+  const treatments = DATA.treatments.filter(t=>t.tags.includes(val));
+  resultEl.innerHTML = `
+    <div class="mob-card keeper">
+      <div class="label">Tag #${calf.tag} · ${calf.farm}</div>
+      <div class="amount" style="font-size:22px;">${shedName(calf.shed)}</div>
+      <div class="sub">Born ${fmtDate(calf.birthDate)} · ${age} day${age===1?'':'s'} old</div>
+      <div class="sub">Today's feed: ${today}</div>
+    </div>
+    ${deaths.length ? `<div class="card" style="border-color:var(--danger);"><strong style="color:var(--danger);">Deceased</strong> — ${deaths[0].reason} on ${fmtDate(deaths[0].date)}</div>` : ''}
+    ${treatments.length ? `<div class="card"><h2>Treatment history</h2>${treatments.map(t=>`<div class="list-item"><span>${t.treatmentType}</span><span class="meta">${fmtDate(t.startDate)}</span></div>`).join('')}</div>` : ''}
+  `;
+}
+
+/* ============ CLIPBOARD ============ */
+function copyText(text){
+  navigator.clipboard.writeText(text).then(()=>{
+    toast('Copied to clipboard');
+  }).catch(()=>{
+    const ta=document.createElement('textarea');
+    ta.value=text; document.body.appendChild(ta); ta.select();
+    try{ document.execCommand('copy'); toast('Copied to clipboard'); }
+    catch(e){ toast('Could not copy — select the text manually'); }
+    document.body.removeChild(ta);
+  });
+}
+
+/* ============ SUMMARY GENERATORS (plain text, no markdown, for pasting into a chat) ============ */
+function genMilkSummary(){
+  const today = todayStr();
+  const lines = [];
+  lines.push('Milk requirements - '+fmtDate(today));
+  lines.push('');
+  lines.push('Keepers');
+  let keeperHead=0, keeperLitres=0;
+  CONFIG.sheds.forEach(s=>{
+    const shedCalves = DATA.calves.filter(c=>c.type==='keeper' && c.shed===s && ageInDays(c.birthDate,today)>=0 && ageInDays(c.birthDate,today)<=CONFIG.keeper.weanDay);
+    const l = shedCalves.reduce((sum,c)=>sum+litresForCalf(c,today),0);
+    keeperHead += shedCalves.length; keeperLitres += l;
+    lines.push(shedName(s)+' - '+shedCalves.length+' head - '+fmtKeeper(l));
+  });
+  lines.push('Keeper total - '+keeperHead+' head - '+fmtKeeper(keeperLitres));
+  lines.push('');
+  const bobbies = DATA.calves.filter(c=>c.type==='bobby' && (!c.cleared || c.clearedDate===today) && ageInDays(c.birthDate,today)>=0);
+  const bobbyLitres = bobbies.reduce((s,c)=>s+litresForCalf(c,today),0);
+  lines.push('Bobbies - '+bobbies.length+' head - '+fmtLitres(bobbyLitres));
+  const herefords = DATA.calves.filter(c=>c.type==='hereford' && ageInDays(c.moveDate,today)>=0);
+  const herefordLitres = herefords.reduce((s,c)=>s+litresForCalf(c,today),0);
+  lines.push('Hereford mob - '+herefords.length+' head - '+fmtLitres(herefordLitres));
+  lines.push('');
+  lines.push('Grand total - '+(keeperHead+bobbies.length+herefords.length)+' head - '+fmtLitres(keeperLitres+bobbyLitres+herefordLitres));
+  return lines.join('\n');
+}
+
+function genCalfTotals(){
+  const today = todayStr();
+  const bornToday = DATA.calves.filter(c=>c.birthDate===today);
+  const allKeepers = DATA.calves.filter(c=>c.type==='keeper');
+  const d1 = allKeepers.filter(c=>c.farm==='D1').length;
+  const d2 = allKeepers.filter(c=>c.farm==='D2').length;
+  const allBobbies = DATA.calves.filter(c=>c.type==='bobby').length;
+  const bobbyD1 = DATA.calves.filter(c=>c.type==='bobby' && c.farm==='D1').length;
+  const bobbyD2 = DATA.calves.filter(c=>c.type==='bobby' && c.farm==='D2').length;
+  const bobbyHF = DATA.calves.filter(c=>c.type==='bobby' && c.farm==='HF').length;
+  const allHerefords = DATA.calves.filter(c=>c.type==='hereford').length;
+  const movedToday = DATA.calves.filter(c=>c.type==='hereford' && c.moveDate===today).length;
+  const activeKeepers = allKeepers.filter(c=>ageInDays(c.birthDate,today)<=CONFIG.keeper.weanDay).length;
+  const activeBobbies = DATA.calves.filter(c=>c.type==='bobby' && (!c.cleared || c.clearedDate===today)).length;
+  const activeHerefords = DATA.calves.filter(c=>c.type==='hereford' && ageInDays(c.moveDate,today)>=0).length;
+
+  const lines = [];
+  lines.push('Calf totals - '+fmtDate(today));
+  lines.push('');
+  lines.push('Born today');
+  lines.push('Keepers - '+bornToday.filter(c=>c.type==='keeper').length);
+  lines.push('Bobbies - '+bornToday.filter(c=>c.type==='bobby').length);
+  lines.push('Moved to Hereford mob today - '+movedToday);
+  lines.push('');
+  lines.push('Season totals');
+  lines.push('Keepers - '+allKeepers.length+' (D1 '+d1+', D2 '+d2+')');
+  lines.push('Bobbies (current) - '+allBobbies+' (D1 '+bobbyD1+', D2 '+bobbyD2+', Hereford '+bobbyHF+')');
+  lines.push('Hereford mob (all time) - '+allHerefords);
+  lines.push('Deaths - '+DATA.deaths.length);
+  lines.push('');
+  lines.push('Currently on farm');
+  lines.push('Keepers - '+activeKeepers);
+  lines.push('Bobbies - '+activeBobbies);
+  lines.push('Hereford mob - '+activeHerefords);
+  return lines.join('\n');
+}
+
+function genTreatmentSummary(){
+  const today = todayStr();
+  const active = DATA.treatments.filter(t=>{
+    const start = new Date(t.startDate+'T00:00:00');
+    const end = new Date(start.getTime()+(t.days-1)*86400000);
+    const now = new Date(today+'T00:00:00');
+    return now>=start && now<=end && t.tags.length>0;
+  });
+  const lines = ['Treatments due - '+fmtDate(today), ''];
+  if(active.length===0){
+    lines.push('No treatments due today.');
+  } else {
+    active.forEach(t=>{
+      const dayNum = ageInDays(t.startDate)+1;
+      lines.push(t.treatmentType+' - day '+dayNum+' of '+t.days);
+      lines.push(t.tags.join(', '));
+      lines.push('');
+    });
+  }
+  return lines.join('\n').trim();
+}
+
+function genDeathSummary(){
+  const today = todayStr();
+  const cutoff = new Date(today+'T00:00:00').getTime() - 14*86400000;
+  const recent = DATA.deaths.filter(d=> new Date(d.date+'T00:00:00').getTime() >= cutoff);
+  const lines = ['Death register - '+fmtDate(today), ''];
+  if(recent.length===0){
+    lines.push('No deaths in the last 14 days.');
+  } else {
+    recent.slice().reverse().forEach(d=>{
+      lines.push(d.tag+' - '+fmtDate(d.date)+' - '+d.reason);
+    });
+  }
+  lines.push('');
+  lines.push('Total deaths this season - '+DATA.deaths.length);
+  return lines.join('\n');
+}
+
+/* ============ BACKUP EXPORT / IMPORT ============ */
+function exportData(){
+  return 'CALF_IMPORT:'+JSON.stringify(DATA);
+}
+function doExport(){
+  window.__exportCode = exportData();
+  document.getElementById('exportBox').innerHTML = `
+    <textarea readonly style="min-height:100px;margin-top:10px;">${window.__exportCode}</textarea>
+    <div style="margin-top:8px;"><button class="btn btn-amber" style="width:100%;" onclick="copyText(window.__exportCode)">Copy code</button></div>`;
+}
+function importData(text){
+  text = (text||'').trim();
+  if(!text.startsWith('CALF_IMPORT:')){ toast('Not a valid CALF_IMPORT code'); return; }
+  let parsed;
+  try{ parsed = JSON.parse(text.slice('CALF_IMPORT:'.length)); }
+  catch(e){ toast('Could not read that code'); return; }
+  if(!parsed.calves || !parsed.treatments || !parsed.deaths){ toast('Missing expected data'); return; }
+  if(!confirm('This will replace all current data on this device. Continue?')) return;
+  localStorage.setItem(STORE_KEY+'_snapshot', JSON.stringify(DATA));
+  DATA = parsed;
+  if(DATA.unit===undefined) DATA.unit = 'L';
+  if(DATA.lastShed===undefined) DATA.lastShed = 1;
+  save();
+  toast('Data imported');
+  renderAll();
+}
+
+/* ============ RENDER: SHARE ============ */
+function renderShare(){
+  const el = document.getElementById('screen-share');
+  el.innerHTML = `
+    <div class="card">
+      <h2>Milk requirements</h2>
+      <textarea readonly style="min-height:170px;">${genMilkSummary()}</textarea>
+      <div style="margin-top:10px;"><button class="btn btn-amber" style="width:100%;" onclick="copyText(genMilkSummary())">Copy summary</button></div>
+    </div>
+    <div class="card">
+      <h2>Calf totals</h2>
+      <textarea readonly style="min-height:190px;">${genCalfTotals()}</textarea>
+      <div style="margin-top:10px;"><button class="btn btn-amber" style="width:100%;" onclick="copyText(genCalfTotals())">Copy summary</button></div>
+    </div>
+    <div class="card">
+      <h2>Treatment register</h2>
+      <textarea readonly style="min-height:140px;">${genTreatmentSummary()}</textarea>
+      <div style="margin-top:10px;"><button class="btn btn-amber" style="width:100%;" onclick="copyText(genTreatmentSummary())">Copy summary</button></div>
+    </div>
+    <div class="card">
+      <h2>Death register</h2>
+      <textarea readonly style="min-height:120px;">${genDeathSummary()}</textarea>
+      <div style="margin-top:10px;"><button class="btn btn-amber" style="width:100%;" onclick="copyText(genDeathSummary())">Copy summary</button></div>
+    </div>
+    <div class="card">
+      <h2>Full backup</h2>
+      <p class="muted">Generate a code to save somewhere safe (e.g. send to yourself), or paste one back in to restore data on this device.</p>
+      <button class="btn btn-outline" style="width:100%;" onclick="doExport()">Generate export code</button>
+      <div id="exportBox"></div>
+      <label style="margin-top:16px;">Restore from a code</label>
+      <textarea id="importInput" placeholder="Paste a CALF_IMPORT code here"></textarea>
+      <div style="margin-top:10px;"><button class="btn btn-outline" style="width:100%;" onclick="importData(document.getElementById('importInput').value)">Import & replace data</button></div>
+    </div>
+  `;
+}
+
+/* ============ RENDER: BOBBY PENS ============ */
+function activeBobbiesQuery(pen, farm){
+  return DATA.calves.filter(c=>c.type==='bobby' && !c.cleared && (pen===undefined || c.pen===pen) && (!farm || c.farm===farm));
+}
+
+/* Groups the active bobbies in a pen+farm by birth date, so calves that arrived
+   via a transfer (and are therefore a different age to the rest) show up as
+   their own group rather than being blended into a single count. */
+function bobbyGroups(pen, farm){
+  const list = DATA.calves.filter(c=>c.type==='bobby' && !c.cleared && c.pen===pen && c.farm===farm);
+  const map = {};
+  list.forEach(c=>{ (map[c.birthDate] = map[c.birthDate] || []).push(c); });
+  const groups = Object.keys(map).map(bd=>({ birthDate: bd, age: ageInDays(bd), count: map[bd].length }));
+  groups.sort((a,b)=> b.count-a.count || a.age-b.age); // largest cohort first
+  return groups;
+}
+
+let groupActionState = {}; // key "pen|farm|birthDate" -> 'clear' | 'transfer' | null
+function groupKey(pen,farm,birthDate){ return pen+'|'+farm+'|'+birthDate; }
+function toggleGroupAction(key, action){
+  groupActionState[key] = (groupActionState[key]===action) ? null : action;
+  renderBobbies();
+}
+
+function renderGroupRow(pen, farm, group, isOutlier){
+  const key = groupKey(pen, farm, group.birthDate);
+  const state = groupActionState[key];
+  const farmLabel = CONFIG.bobbyFarms[farm] || farm;
+  let form = '';
+  if(state === 'clear'){
+    form = `
+      <div style="margin-top:8px;">
+        <label>How many leaving?</label>
+        <input type="number" id="gqty-${key}" min="1" max="${group.count}" value="${group.count}">
+        <div class="btn-row" style="margin-top:8px;">
+          <button class="btn btn-sm btn-primary" onclick="confirmGroupClear(${pen},'${farm}','${group.birthDate}')">Confirm clear</button>
+          <button class="btn btn-sm btn-outline" onclick="toggleGroupAction('${key}',null)">Cancel</button>
+        </div>
+      </div>`;
+  } else if(state === 'transfer'){
+    form = `
+      <div style="margin-top:8px;">
+        <label>How many transferring?</label>
+        <input type="number" id="gqty-${key}" min="1" max="${group.count}" value="${group.count}">
+        <label>To</label>
+        <select id="gdest-${key}">
+          ${CONFIG.bobbyPens.filter(x=>x!==pen).map(x=>`<option value="${x}">Pen ${x}</option>`).join('')}
+          ${farm==='HF' ? `<option value="hereford-mob">Move to Hereford mob (7L/day)</option>` : ''}
+        </select>
+        <div class="btn-row" style="margin-top:8px;">
+          <button class="btn btn-sm btn-primary" onclick="confirmGroupTransfer(${pen},'${farm}','${group.birthDate}')">Confirm transfer</button>
+          <button class="btn btn-sm btn-outline" onclick="toggleGroupAction('${key}',null)">Cancel</button>
+        </div>
+      </div>`;
+  } else if(state === 'reclassify'){
+    const otherFarms = Object.keys(CONFIG.bobbyFarms).filter(f=>f!==farm);
+    form = `
+      <div style="margin-top:8px;">
+        <label>How many reclassifying?</label>
+        <input type="number" id="rqty-${key}" min="1" max="${group.count}" value="${group.count}">
+        <label>Reclassify as</label>
+        <select id="rdest-${key}">
+          ${otherFarms.map(f=>`<option value="${f}">${CONFIG.bobbyFarms[f]}</option>`).join('')}
+        </select>
+        <div class="muted" style="margin-top:6px;">Stays in this pen on ${CONFIG.bobby.fullL}L — this only fixes the classification, it doesn't move them anywhere.</div>
+        <div class="btn-row" style="margin-top:10px;">
+          <button class="btn btn-sm btn-primary" onclick="confirmReclassify(${pen},'${farm}','${group.birthDate}')">Confirm reclassify</button>
+          <button class="btn btn-sm btn-outline" onclick="toggleGroupAction('${key}',null)">Cancel</button>
+        </div>
+      </div>`;
+  }
+  return `
+    <div style="border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-top:6px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:13px;font-weight:600;">${farmLabel} · ${group.age} day${group.age===1?'':'s'} old${isOutlier?' ⚠':''}</span>
+        <span style="font-size:13px;">${group.count} head</span>
+      </div>
+      ${isOutlier ? `<div class="muted" style="margin-top:2px;">Different age to the rest of this pen — likely a transfer or hold-back.</div>` : ''}
+      <div class="btn-row" style="margin-top:6px;gap:6px;">
+        <button class="btn btn-sm btn-outline" onclick="toggleGroupAction('${key}','clear')">${state==='clear'?'Close':'Clear'}</button>
+        <button class="btn btn-sm btn-outline" onclick="toggleGroupAction('${key}','transfer')">${state==='transfer'?'Close':'Transfer'}</button>
+        <button class="btn btn-sm btn-outline" onclick="toggleGroupAction('${key}','reclassify')">${state==='reclassify'?'Close':'Reclassify'}</button>
+      </div>
+      ${form}
+    </div>`;
+}
+
+function confirmReclassify(pen, farm, birthDate){
+  const key = groupKey(pen, farm, birthDate);
+  const list = DATA.calves.filter(c=>c.type==='bobby' && !c.cleared && c.pen===pen && c.farm===farm && c.birthDate===birthDate);
+  if(list.length===0){ toast('Nothing to reclassify'); groupActionState[key]=null; renderBobbies(); return; }
+  const input = document.getElementById('rqty-'+key);
+  const destSelect = document.getElementById('rdest-'+key);
+  let qty = parseInt(input.value,10);
+  if(isNaN(qty) || qty<0) qty = 0;
+  if(qty>list.length) qty = list.length;
+  const newFarm = destSelect.value;
+  for(let i=0;i<qty;i++){ list[i].farm = newFarm; }
+  toast(`${qty} reclassified as ${CONFIG.bobbyFarms[newFarm]}`);
+  groupActionState[key] = null;
+  save();
+  renderAll();
+}
+
+function renderBobbies(){
+  const el = document.getElementById('screen-bobbies');
+  if(!el) return;
+  const d1Total = activeBobbiesQuery(undefined,'D1').length;
+  const d2Total = activeBobbiesQuery(undefined,'D2').length;
+  const hfTotal = activeBobbiesQuery(undefined,'HF').length;
+  const grandTotal = DATA.calves.filter(c=>c.type==='bobby' && !c.cleared).length;
+
+  let penCards = '';
+  CONFIG.bobbyPens.forEach(p=>{
+    const inPen = activeBobbiesQuery(p);
+    if(inPen.length===0){
+      penCards += `
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;">
+            <h2 style="margin:0;">Pen ${p}</h2>
+            <span style="font-family:'Fraunces',serif;font-size:22px;font-weight:600;">0</span>
+          </div>
+          <div class="muted" style="margin-top:6px;">Empty</div>
+        </div>`;
+      return;
+    }
+    const oldestAge = Math.max(...inPen.map(c=>ageInDays(c.birthDate)));
+    const overdue = oldestAge >= CONFIG.bobby.overdueDays;
+
+    let rows = '';
+    ['D1','D2','HF'].forEach(farm=>{
+      const groups = bobbyGroups(p, farm);
+      groups.forEach((g,i)=>{
+        rows += renderGroupRow(p, farm, g, groups.length>1 && i>0);
+      });
+    });
+
+    penCards += `
+      <div class="card" style="${overdue?'border-color:var(--danger);':''}">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;">
+          <h2 style="margin:0;">Pen ${p}</h2>
+          <span style="font-family:'Fraunces',serif;font-size:22px;font-weight:600;">${inPen.length}</span>
+        </div>
+        <div class="muted" style="margin-top:4px;">Oldest ${oldestAge} day${oldestAge===1?'':'s'}${overdue?' · overdue for transport':''}</div>
+        ${rows}
+      </div>`;
+  });
+
+  el.innerHTML = `
+    <div class="grand-total" style="margin-bottom:14px;">
+      <span>Active bobbies</span>
+      <span class="amount">${grandTotal}</span>
+    </div>
+    <div class="card">
+      <div class="muted">D1: ${d1Total} &nbsp;·&nbsp; D2: ${d2Total} &nbsp;·&nbsp; Hereford: ${hfTotal}</div>
+    </div>
+    ${penCards}
+  `;
+}
+
+function confirmGroupClear(pen, farm, birthDate){
+  const key = groupKey(pen, farm, birthDate);
+  const list = DATA.calves.filter(c=>c.type==='bobby' && !c.cleared && c.pen===pen && c.farm===farm && c.birthDate===birthDate);
+  if(list.length===0){ toast('Nothing to clear'); groupActionState[key]=null; renderBobbies(); return; }
+  const input = document.getElementById('gqty-'+key);
+  let qty = parseInt(input.value,10);
+  if(isNaN(qty) || qty<0) qty = 0;
+  if(qty>list.length) qty = list.length;
+  const today = todayStr();
+  for(let i=0;i<qty;i++){ list[i].cleared = true; list[i].clearedDate = today; }
+  toast(`${qty} cleared from Pen ${pen}`);
+  groupActionState[key] = null;
+  save();
+  renderAll();
+}
+
+function confirmGroupTransfer(pen, farm, birthDate){
+  const key = groupKey(pen, farm, birthDate);
+  const list = DATA.calves.filter(c=>c.type==='bobby' && !c.cleared && c.pen===pen && c.farm===farm && c.birthDate===birthDate);
+  if(list.length===0){ toast('Nothing to transfer'); groupActionState[key]=null; renderBobbies(); return; }
+  const input = document.getElementById('gqty-'+key);
+  const destSelect = document.getElementById('gdest-'+key);
+  let qty = parseInt(input.value,10);
+  if(isNaN(qty) || qty<0) qty = 0;
+  if(qty>list.length) qty = list.length;
+  const destVal = destSelect.value;
+
+  if(destVal === 'hereford-mob'){
+    const today = todayStr();
+    for(let i=0;i<qty;i++){
+      list[i].type = 'hereford';
+      list[i].moveDate = today;
+      list[i].pen = null;
+    }
+    toast(`${qty} moved to the Hereford mob`);
+  } else {
+    const dest = parseInt(destVal,10);
+    for(let i=0;i<qty;i++){ list[i].pen = dest; }
+    toast(`${qty} transferred from Pen ${pen} to Pen ${dest}`);
+  }
+  groupActionState[key] = null;
+  save();
+  renderAll();
+}
+
+/* ============ RENDER: PUSH REGISTER ============ */
+let pushBuildState = { shed:null, farm:null, selectedTags:new Set() };
+
+function pickPushShed(s){ pushBuildState.shed=s; pushBuildState.farm=null; pushBuildState.selectedTags=new Set(); renderPush(); }
+function pickPushFarm(f){ pushBuildState.farm=f; pushBuildState.selectedTags=new Set(); renderPush(); }
+function togglePushTag(t){
+  if(pushBuildState.selectedTags.has(t)) pushBuildState.selectedTags.delete(t);
+  else pushBuildState.selectedTags.add(t);
+  renderPush();
+}
+function addToPushList(){
+  if(pushBuildState.selectedTags.size===0) return;
+  pushBuildState.selectedTags.forEach(t=>{
+    DATA.pushList.push({ id: uid(), tag:t, shed: pushBuildState.shed, farm: pushBuildState.farm, pushed:false });
+  });
+  toast(`${pushBuildState.selectedTags.size} added to the pushing list`);
+  pushBuildState.selectedTags = new Set();
+  save();
+  renderPush();
+}
+function togglePushed(id){
+  const item = DATA.pushList.find(p=>p.id===id);
+  if(!item) return;
+  item.pushed = !item.pushed;
+  save();
+  renderPush();
+}
+let pushClearConfirming = false;
+function clearPushList(){
+  if(DATA.pushList.length===0) return;
+  pushClearConfirming = true;
+  renderPush();
+}
+function confirmClearPushList(){
+  DATA.pushList = [];
+  pushClearConfirming = false;
+  save();
+  toast('Pushing list cleared');
+  renderPush();
+}
+function cancelClearPushList(){
+  pushClearConfirming = false;
+  renderPush();
+}
+function copyPushList(){
+  const lines = ['Pushing list - '+fmtDate(todayStr()), ''];
+  let any = false;
+  CONFIG.sheds.forEach(s=>{
+    const items = DATA.pushList.filter(p=>p.shed===s && !p.pushed);
+    if(items.length===0) return;
+    any = true;
+    lines.push(shedName(s));
+    lines.push(items.map(p=>p.tag).join(', '));
+    lines.push('');
+  });
+  if(!any){ toast('Nothing left to push — everything on the list is already done'); return; }
+  copyText(lines.join('\n').trim());
+}
+
+function renderPush(){
+  const el = document.getElementById('screen-push');
+  if(!el) return;
+  const shed = pushBuildState.shed;
+  const farm = pushBuildState.farm;
+  const today = todayStr();
+
+  let addSection = `
+    <div class="card">
+      <h2>Add to pushing list</h2>
+      <label>Shed</label>
+      <div class="shed-picker">
+        ${CONFIG.sheds.map(s=>`<button class="${shed===s?'selected':''}" onclick="pickPushShed(${s})">${shedName(s)}</button>`).join('')}
+      </div>`;
+
+  if(shed){
+    addSection += `
+      <label>Farm</label>
+      <div class="farm-picker">
+        <button class="${farm==='D1'?'selected':''}" onclick="pickPushFarm('D1')">D1</button>
+        <button class="${farm==='D2'?'selected':''}" onclick="pickPushFarm('D2')">D2</button>
+      </div>`;
+  }
+
+  if(shed && farm){
+    const alreadyOnList = new Set(DATA.pushList.filter(p=>!p.pushed && p.shed===shed && p.farm===farm).map(p=>p.tag));
+    const candidates = DATA.calves.filter(c=>c.type==='keeper' && c.shed===shed && c.farm===farm
+      && ageInDays(c.birthDate,today) >= 0 && ageInDays(c.birthDate,today) <= CONFIG.keeper.weanDay
+      && !alreadyOnList.has(c.tag));
+    candidates.sort((a,b)=>a.tag-b.tag);
+    addSection += `
+      <label>Tap tag numbers (${pushBuildState.selectedTags.size} selected)</label>
+      <div class="tag-grid">
+        ${candidates.length ? candidates.map(c=>`<div class="tag-chip ${pushBuildState.selectedTags.has(c.tag)?'selected':''}" onclick="togglePushTag(${c.tag})">${c.tag}</div>`).join('') : '<div class="empty">No tags available — everything active here is already on the list.</div>'}
+      </div>
+      <div style="margin-top:14px;">
+        <button class="btn btn-primary" onclick="addToPushList()" ${pushBuildState.selectedTags.size===0?'disabled':''}>Add ${pushBuildState.selectedTags.size||''} to list</button>
+      </div>`;
+  }
+  addSection += `</div>`;
+
+  const total = DATA.pushList.length;
+  const remaining = DATA.pushList.filter(p=>!p.pushed).length;
+
+  let listSection = `<div class="card"><h2>Pushing list ${total>0?`(${remaining} of ${total} remaining)`:''}</h2>`;
+  if(total===0){
+    listSection += `<div class="empty">No calves on the list yet.</div>`;
+  } else {
+    CONFIG.sheds.forEach(s=>{
+      const items = DATA.pushList.filter(p=>p.shed===s);
+      if(items.length===0) return;
+      listSection += `<div class="muted" style="margin-top:10px;font-weight:700;">${shedName(s)}</div><div class="tag-list" style="margin-top:6px;">`;
+      items.forEach(p=>{
+        listSection += `<span style="cursor:pointer;${p.pushed?'text-decoration:line-through;opacity:.5;':''}" onclick="togglePushed('${p.id}')">${p.tag}</span>`;
+      });
+      listSection += `</div>`;
+    });
+    listSection += `
+      <div class="btn-row" style="margin-top:14px;">
+        <button class="btn btn-amber" onclick="copyPushList()">Copy list</button>
+        <button class="btn btn-danger" onclick="clearPushList()">Clear list</button>
+      </div>
+      <div class="muted" style="margin-top:8px;">Tap a tag in the list to cross it off as it's done. Copy list only sends the ones not yet crossed off.</div>
+      ${pushClearConfirming ? `
+        <div style="margin-top:10px;padding-top:10px;border-top:1px dashed var(--line);">
+          <div class="muted" style="margin-bottom:8px;">Clear the whole list? This can't be undone.</div>
+          <div class="btn-row">
+            <button class="btn btn-sm btn-danger" onclick="confirmClearPushList()">Yes, clear it</button>
+            <button class="btn btn-sm btn-outline" onclick="cancelClearPushList()">Cancel</button>
+          </div>
+        </div>` : ''}`;
+  }
+  listSection += `</div>`;
+
+  el.innerHTML = addSection + listSection;
+}
+
+/* ============ RENDER ALL ============ */
+function renderAll(){
+  renderToday();
+  renderBirths();
+  renderBobbies();
+  renderPush();
+  renderTreatments();
+  renderDeaths();
+  renderLookup();
+  renderShare();
+}
+
+// init unit toggle state from storage
+document.getElementById('unitL').classList.toggle('active', DATA.unit==='L');
+document.getElementById('unitKg').classList.toggle('active', DATA.unit==='kg');
+renderAll();
+</script>
+</body>
+</html>
