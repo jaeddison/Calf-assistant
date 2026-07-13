@@ -13,6 +13,9 @@
 <meta name="apple-mobile-web-app-title" content="Calf Assistant">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore-compat.js"></script>
 <style>
   :root{
     --bg:#F5F1E6;
@@ -137,13 +140,33 @@
   .collapsible.open{max-height:2000px;}
 
   textarea{min-height:70px;resize:vertical;}
+
+  /* Login screen */
+  #loginScreen{max-width:400px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;justify-content:center;padding:24px;}
+  #loginScreen h1{font-size:26px;color:var(--forest);margin-bottom:6px;}
+  #loginScreen p.sub{color:var(--ink-soft);font-size:14px;margin-bottom:20px;}
+  #loginError{color:var(--danger);font-size:13px;margin-top:10px;min-height:18px;}
+  #logoutBtn{background:rgba(255,255,255,.12);border:none;color:#F5F1E6;font-size:11px;padding:5px 10px;border-radius:8px;cursor:pointer;margin-top:8px;}
 </style>
 </head>
 <body>
-<div class="app">
+<div id="loginScreen">
+  <h1>Calf Assistant</h1>
+  <p class="sub">Sign in to continue.</p>
+  <label>Email</label>
+  <input type="email" id="loginEmail" placeholder="you@example.com" autocomplete="username">
+  <label>Password</label>
+  <input type="password" id="loginPassword" placeholder="Password" autocomplete="current-password">
+  <div style="margin-top:16px;">
+    <button class="btn btn-primary" style="width:100%;" onclick="login()">Sign in</button>
+  </div>
+  <div id="loginError"></div>
+</div>
+<div class="app" style="display:none;">
   <header class="top">
     <div class="eyebrow" id="headerEyebrow">Calf Assistant</div>
     <h1 id="headerTitle">Today</h1>
+    <button id="logoutBtn" onclick="logout()">Sign out</button>
     <div class="unit-toggle">
       <button id="unitL" class="active" onclick="setUnit('L')">L</button>
       <button id="unitKg" onclick="setUnit('kg')">kg</button>
@@ -207,18 +230,112 @@ const CONFIG = {
 };
 function shedName(s){ return CONFIG.shedNames[s] || ('Shed '+s); }
 
-/* ============ STORAGE ============ */
-const STORE_KEY = 'calfAssistantData';
-function loadData(){
-  try{
-    const raw = localStorage.getItem(STORE_KEY);
-    if(raw) return JSON.parse(raw);
-  }catch(e){}
-  return { calves: [], treatments: [], deaths: [], pushList: [], lastShed: 1, lastBobbyPen: 1, unit: 'L' };
+/* ============ FIREBASE INIT ============ */
+const firebaseConfig = {
+  apiKey: "AIzaSyATJRrzv25th-8A9KYzMqj4TpLNWvSl5tM",
+  authDomain: "calf-assistant-c7811.firebaseapp.com",
+  projectId: "calf-assistant-c7811",
+  storageBucket: "calf-assistant-c7811.firebasestorage.app",
+  messagingSenderId: "725500217327",
+  appId: "1:725500217327:web:f41f3cd03e5181d0e3581a"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+/* ============ DATA (populated live from Firestore, never written to directly) ============ */
+let DATA = { calves: [], treatments: [], deaths: [], pushList: [], lastShed: 1, lastBobbyPen: 1, unit: 'L' };
+let currentRole = null; // 'admin' | 'helper'
+let unsubscribers = [];
+
+/* ============ AUTH ============ */
+function login(){
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  document.getElementById('loginError').textContent = '';
+  auth.signInWithEmailAndPassword(email, password).catch(()=>{
+    document.getElementById('loginError').textContent = 'Sign in failed — check the email and password.';
+  });
 }
-let DATA = loadData();
-if(!DATA.pushList) DATA.pushList = [];
-function save(){ localStorage.setItem(STORE_KEY, JSON.stringify(DATA)); }
+function logout(){
+  detachListeners();
+  auth.signOut();
+}
+
+auth.onAuthStateChanged(async (user)=>{
+  if(user){
+    let role = null;
+    try{
+      const roleDoc = await db.collection('users').doc(user.uid).get();
+      role = roleDoc.exists ? roleDoc.data().role : null;
+    }catch(e){
+      role = null;
+    }
+    if(role !== 'admin' && role !== 'helper'){
+      document.getElementById('loginError').textContent = 'Your account isn\'t set up yet — check with James.';
+      auth.signOut();
+      return;
+    }
+    currentRole = role;
+    document.getElementById('loginScreen').style.display = 'none';
+    document.querySelector('.app').style.display = '';
+    setupForRole();
+    attachListeners();
+  } else {
+    currentRole = null;
+    document.getElementById('loginScreen').style.display = '';
+    document.querySelector('.app').style.display = 'none';
+  }
+});
+
+function setupForRole(){
+  const helperOnly = currentRole === 'helper';
+  document.querySelectorAll('nav.bottom button').forEach(btn=>{
+    btn.style.display = (!helperOnly || btn.dataset.screen === 'push') ? '' : 'none';
+  });
+  showScreen(helperOnly ? 'push' : 'today');
+}
+
+/* ============ FIRESTORE LISTENERS ============ */
+function attachListeners(){
+  unsubscribers.push(db.collection('pushList').onSnapshot(snap=>{
+    DATA.pushList = snap.docs.map(d=>({ id: d.id, ...d.data() }));
+    renderPush();
+  }, err=>toast('Push list sync error: '+err.message)));
+
+  if(currentRole === 'admin'){
+    unsubscribers.push(db.collection('calves').onSnapshot(snap=>{
+      DATA.calves = snap.docs.map(d=>({ id: d.id, ...d.data() }));
+      renderAll();
+    }, err=>toast('Calves sync error: '+err.message)));
+
+    unsubscribers.push(db.collection('treatments').onSnapshot(snap=>{
+      DATA.treatments = snap.docs.map(d=>({ id: d.id, ...d.data() }));
+      renderTreatments();
+    }, err=>toast('Treatments sync error: '+err.message)));
+
+    unsubscribers.push(db.collection('deaths').onSnapshot(snap=>{
+      DATA.deaths = snap.docs.map(d=>({ id: d.id, ...d.data() }));
+      renderDeaths();
+    }, err=>toast('Deaths sync error: '+err.message)));
+
+    unsubscribers.push(db.collection('meta').doc('settings').onSnapshot(doc=>{
+      const d = doc.data() || {};
+      DATA.lastShed = d.lastShed || 1;
+      DATA.lastBobbyPen = d.lastBobbyPen || 1;
+      DATA.unit = d.unit || 'L';
+      const unitLBtn = document.getElementById('unitL');
+      const unitKgBtn = document.getElementById('unitKg');
+      if(unitLBtn){ unitLBtn.classList.toggle('active', DATA.unit==='L'); }
+      if(unitKgBtn){ unitKgBtn.classList.toggle('active', DATA.unit==='kg'); }
+      renderAll();
+    }, err=>toast('Settings sync error: '+err.message)));
+  }
+}
+function detachListeners(){
+  unsubscribers.forEach(u=>u());
+  unsubscribers = [];
+}
 
 /* ============ HELPERS ============ */
 function todayStr(){ return new Date().toISOString().slice(0,10); }
@@ -296,10 +413,9 @@ function availableTags(farm){
 
 /* ============ UNIT TOGGLE ============ */
 function setUnit(u){
-  DATA.unit = u; save();
   document.getElementById('unitL').classList.toggle('active', u==='L');
   document.getElementById('unitKg').classList.toggle('active', u==='kg');
-  renderAll();
+  db.collection('meta').doc('settings').set({unit:u}, {merge:true}).catch(err=>toast('Error: '+err.message));
 }
 
 /* ============ NAV ============ */
@@ -518,12 +634,15 @@ function saveBobby(){
   if(!n || n<1){ toast('Enter a number first'); return; }
   if(!birthState.farm){ toast('Pick a farm first'); return; }
   const pen = birthState.pen || DATA.lastBobbyPen;
+  const batch = db.batch();
   for(let i=0;i<n;i++){
-    DATA.calves.push({ id: uid(), type:'bobby', farm: birthState.farm, tag:null, shed:null, pen: pen, cleared:false, birthDate: birthState.date });
+    const ref = db.collection('calves').doc(uid());
+    batch.set(ref, { type:'bobby', farm: birthState.farm, tag:null, shed:null, pen: pen, cleared:false, birthDate: birthState.date });
   }
-  DATA.lastBobbyPen = pen;
-  save();
-  toast(`${n} bobbies logged to Pen ${pen}`);
+  batch.set(db.collection('meta').doc('settings'), {lastBobbyPen: pen}, {merge:true});
+  batch.commit().then(()=>{
+    toast(`${n} bobbies logged to Pen ${pen}`);
+  }).catch(err=>toast('Error: '+err.message));
   birthState.type = null; birthState.farm = null; birthState.pen = null;
   renderBirths();
 }
@@ -531,20 +650,22 @@ function saveBobby(){
 function saveKeepers(){
   if(birthState.selectedTags.size===0) return;
   const shed = birthState.shed || DATA.lastShed;
+  const count = birthState.selectedTags.size;
+  const batch = db.batch();
   birthState.selectedTags.forEach(t=>{
-    DATA.calves.push({ id: uid(), type:'keeper', farm: birthState.farm, tag: t, shed: shed, birthDate: birthState.date });
+    const ref = db.collection('calves').doc(uid());
+    batch.set(ref, { type:'keeper', farm: birthState.farm, tag: t, shed: shed, birthDate: birthState.date });
   });
-  DATA.lastShed = shed;
-  save();
-  toast(`${birthState.selectedTags.size} keeper(s) added to Shed ${shed}`);
+  batch.set(db.collection('meta').doc('settings'), {lastShed: shed}, {merge:true});
+  batch.commit().then(()=>{
+    toast(`${count} keeper(s) added to Shed ${shed}`);
+  }).catch(err=>toast('Error: '+err.message));
   birthState.selectedTags = new Set();
   renderBirths();
 }
 
 function undoCalf(id){
-  DATA.calves = DATA.calves.filter(c=>c.id!==id);
-  save();
-  renderBirths();
+  db.collection('calves').doc(id).delete().catch(err=>toast('Error: '+err.message));
 }
 
 /* ============ RENDER: TREATMENTS ============ */
@@ -631,17 +752,17 @@ function saveTreatment(){
   const notes = document.getElementById('treatNotes').value.trim();
   if(!type || !tagsRaw || !days){ toast('Fill in type, tags and duration'); return; }
   const tags = tagsRaw.split(/[,\s]+/).filter(Boolean);
-  DATA.treatments.push({ id: uid(), treatmentType:type, tags, startDate:start, days, notes });
-  save();
-  toast(`Treatment logged for ${tags.length} calf/calves`);
+  db.collection('treatments').doc(uid()).set({ treatmentType:type, tags, startDate:start, days, notes })
+    .then(()=>toast(`Treatment logged for ${tags.length} calf/calves`))
+    .catch(err=>toast('Error: '+err.message));
   treatFormOpen = false;
   renderTreatments();
 }
 function removeTagFromTreatment(id, tag){
   const t = DATA.treatments.find(x=>x.id===id);
   if(!t) return;
-  t.tags = t.tags.filter(x=>x!==tag);
-  save(); renderTreatments();
+  const newTags = t.tags.filter(x=>x!==tag);
+  db.collection('treatments').doc(id).update({tags:newTags}).catch(err=>toast('Error: '+err.message));
 }
 function addTagsToTreatment(id){
   const more = prompt('Add tag numbers (comma or space separated):');
@@ -649,13 +770,12 @@ function addTagsToTreatment(id){
   const t = DATA.treatments.find(x=>x.id===id);
   if(!t) return;
   const newTags = more.split(/[,\s]+/).filter(Boolean);
-  t.tags = [...new Set([...t.tags, ...newTags])];
-  save(); renderTreatments();
+  const merged = [...new Set([...t.tags, ...newTags])];
+  db.collection('treatments').doc(id).update({tags:merged}).catch(err=>toast('Error: '+err.message));
 }
 function cancelTreatment(id){
   if(!confirm('Cancel this whole treatment?')) return;
-  DATA.treatments = DATA.treatments.filter(x=>x.id!==id);
-  save(); renderTreatments();
+  db.collection('treatments').doc(id).delete().catch(err=>toast('Error: '+err.message));
 }
 
 /* ============ RENDER: DEATHS ============ */
@@ -691,10 +811,9 @@ function saveDeath(){
   const date = document.getElementById('deathDate').value;
   const reason = document.getElementById('deathReason').value.trim();
   if(!tag || !reason){ toast('Enter a tag and reason'); return; }
-  DATA.deaths.push({ tag, date, reason });
-  save();
-  toast('Death recorded');
-  renderDeaths();
+  db.collection('deaths').doc(uid()).set({ tag, date, reason })
+    .then(()=>toast('Death recorded'))
+    .catch(err=>toast('Error: '+err.message));
 }
 
 /* ============ RENDER: LOOKUP ============ */
@@ -718,6 +837,7 @@ function doLookup(){
   const today = fmtKeeper(litresForCalf(calf));
   const deaths = DATA.deaths.filter(d=>d.tag===val);
   const treatments = DATA.treatments.filter(t=>t.tags.includes(val));
+  const note = calf.note || '';
   resultEl.innerHTML = `
     <div class="mob-card keeper">
       <div class="label">Tag #${calf.tag} · ${calf.farm}</div>
@@ -727,7 +847,27 @@ function doLookup(){
     </div>
     ${deaths.length ? `<div class="card" style="border-color:var(--danger);"><strong style="color:var(--danger);">Deceased</strong> — ${deaths[0].reason} on ${fmtDate(deaths[0].date)}</div>` : ''}
     ${treatments.length ? `<div class="card"><h2>Treatment history</h2>${treatments.map(t=>`<div class="list-item"><span>${t.treatmentType}</span><span class="meta">${fmtDate(t.startDate)}</span></div>`).join('')}</div>` : ''}
+    <div class="card">
+      <h2>Note</h2>
+      <textarea id="noteInput-${calf.id}" maxlength="300" placeholder="e.g. slow to feed, watch closely">${note}</textarea>
+      <div class="muted" id="noteCount-${calf.id}" style="margin-top:4px;">${note.length}/300</div>
+      <div style="margin-top:10px;">
+        <button class="btn btn-primary" onclick="saveNote('${calf.id}')">Save note</button>
+      </div>
+    </div>
   `;
+  const ta = document.getElementById('noteInput-'+calf.id);
+  if(ta){
+    ta.addEventListener('input', ()=>{
+      document.getElementById('noteCount-'+calf.id).textContent = ta.value.length+'/300';
+    });
+  }
+}
+function saveNote(calfId){
+  const ta = document.getElementById('noteInput-'+calfId);
+  db.collection('calves').doc(calfId).update({note: ta.value.trim()})
+    .then(()=>toast('Note saved'))
+    .catch(err=>toast('Error: '+err.message));
 }
 
 /* ============ CLIPBOARD ============ */
@@ -856,21 +996,67 @@ function doExport(){
     <textarea readonly style="min-height:100px;margin-top:10px;">${window.__exportCode}</textarea>
     <div style="margin-top:8px;"><button class="btn btn-amber" style="width:100%;" onclick="copyText(window.__exportCode)">Copy code</button></div>`;
 }
-function importData(text){
+
+// Firestore batches cap at 500 operations — chunk to stay safely under that.
+async function commitOpsInChunks(ops){
+  const CHUNK = 400;
+  for(let i=0; i<ops.length; i+=CHUNK){
+    const batch = db.batch();
+    ops.slice(i, i+CHUNK).forEach(op=>op(batch));
+    await batch.commit();
+  }
+}
+
+async function importData(text){
   text = (text||'').trim();
   if(!text.startsWith('CALF_IMPORT:')){ toast('Not a valid CALF_IMPORT code'); return; }
   let parsed;
   try{ parsed = JSON.parse(text.slice('CALF_IMPORT:'.length)); }
   catch(e){ toast('Could not read that code'); return; }
   if(!parsed.calves || !parsed.treatments || !parsed.deaths){ toast('Missing expected data'); return; }
-  if(!confirm('This will replace all current data on this device. Continue?')) return;
-  localStorage.setItem(STORE_KEY+'_snapshot', JSON.stringify(DATA));
-  DATA = parsed;
-  if(DATA.unit===undefined) DATA.unit = 'L';
-  if(DATA.lastShed===undefined) DATA.lastShed = 1;
-  save();
-  toast('Data imported');
-  renderAll();
+  if(!confirm('This replaces ALL data for EVERYONE using this app right now — not just this device — and can\'t be undone. Continue?')) return;
+
+  toast('Importing — this may take a moment...');
+  try{
+    const collections = ['calves','treatments','deaths','pushList'];
+    const deleteOps = [];
+    for(const colName of collections){
+      const snap = await db.collection(colName).get();
+      snap.forEach(doc=>{ deleteOps.push(batch=>batch.delete(doc.ref)); });
+    }
+    await commitOpsInChunks(deleteOps);
+
+    const createOps = [];
+    (parsed.calves||[]).forEach(c=>{
+      const id = c.id || uid();
+      const data = {...c}; delete data.id;
+      createOps.push(batch=>batch.set(db.collection('calves').doc(id), data));
+    });
+    (parsed.treatments||[]).forEach(t=>{
+      const id = t.id || uid();
+      const data = {...t}; delete data.id;
+      createOps.push(batch=>batch.set(db.collection('treatments').doc(id), data));
+    });
+    (parsed.deaths||[]).forEach(d=>{
+      const id = d.id || uid();
+      const data = {...d}; delete data.id;
+      createOps.push(batch=>batch.set(db.collection('deaths').doc(id), data));
+    });
+    (parsed.pushList||[]).forEach(p=>{
+      const id = p.id || uid();
+      const data = {...p}; delete data.id;
+      createOps.push(batch=>batch.set(db.collection('pushList').doc(id), data));
+    });
+    createOps.push(batch=>batch.set(db.collection('meta').doc('settings'), {
+      unit: parsed.unit || 'L',
+      lastShed: parsed.lastShed || 1,
+      lastBobbyPen: parsed.lastBobbyPen || 1
+    }));
+    await commitOpsInChunks(createOps);
+    toast('Data imported');
+  }catch(err){
+    toast('Import failed: '+err.message);
+  }
 }
 
 /* ============ RENDER: SHARE ============ */
@@ -1006,11 +1192,13 @@ function confirmReclassify(pen, farm, birthDate){
   if(isNaN(qty) || qty<0) qty = 0;
   if(qty>list.length) qty = list.length;
   const newFarm = destSelect.value;
-  for(let i=0;i<qty;i++){ list[i].farm = newFarm; }
-  toast(`${qty} reclassified as ${CONFIG.bobbyFarms[newFarm]}`);
+  const batch = db.batch();
+  for(let i=0;i<qty;i++){ batch.update(db.collection('calves').doc(list[i].id), {farm: newFarm}); }
+  batch.commit().then(()=>{
+    toast(`${qty} reclassified as ${CONFIG.bobbyFarms[newFarm]}`);
+  }).catch(err=>toast('Error: '+err.message));
   groupActionState[key] = null;
-  save();
-  renderAll();
+  renderBobbies();
 }
 
 function renderBobbies(){
@@ -1078,11 +1266,13 @@ function confirmGroupClear(pen, farm, birthDate){
   if(isNaN(qty) || qty<0) qty = 0;
   if(qty>list.length) qty = list.length;
   const today = todayStr();
-  for(let i=0;i<qty;i++){ list[i].cleared = true; list[i].clearedDate = today; }
-  toast(`${qty} cleared from Pen ${pen}`);
+  const batch = db.batch();
+  for(let i=0;i<qty;i++){ batch.update(db.collection('calves').doc(list[i].id), {cleared:true, clearedDate: today}); }
+  batch.commit().then(()=>{
+    toast(`${qty} cleared from Pen ${pen}`);
+  }).catch(err=>toast('Error: '+err.message));
   groupActionState[key] = null;
-  save();
-  renderAll();
+  renderBobbies();
 }
 
 function confirmGroupTransfer(pen, farm, birthDate){
@@ -1095,23 +1285,25 @@ function confirmGroupTransfer(pen, farm, birthDate){
   if(isNaN(qty) || qty<0) qty = 0;
   if(qty>list.length) qty = list.length;
   const destVal = destSelect.value;
+  const batch = db.batch();
 
   if(destVal === 'hereford-mob'){
     const today = todayStr();
     for(let i=0;i<qty;i++){
-      list[i].type = 'hereford';
-      list[i].moveDate = today;
-      list[i].pen = null;
+      batch.update(db.collection('calves').doc(list[i].id), {type:'hereford', moveDate: today, pen: null});
     }
-    toast(`${qty} moved to the Hereford mob`);
+    batch.commit().then(()=>{
+      toast(`${qty} moved to the Hereford mob`);
+    }).catch(err=>toast('Error: '+err.message));
   } else {
     const dest = parseInt(destVal,10);
-    for(let i=0;i<qty;i++){ list[i].pen = dest; }
-    toast(`${qty} transferred from Pen ${pen} to Pen ${dest}`);
+    for(let i=0;i<qty;i++){ batch.update(db.collection('calves').doc(list[i].id), {pen: dest}); }
+    batch.commit().then(()=>{
+      toast(`${qty} transferred from Pen ${pen} to Pen ${dest}`);
+    }).catch(err=>toast('Error: '+err.message));
   }
   groupActionState[key] = null;
-  save();
-  renderAll();
+  renderBobbies();
 }
 
 /* ============ RENDER: PUSH REGISTER ============ */
@@ -1126,20 +1318,22 @@ function togglePushTag(t){
 }
 function addToPushList(){
   if(pushBuildState.selectedTags.size===0) return;
+  const count = pushBuildState.selectedTags.size;
+  const batch = db.batch();
   pushBuildState.selectedTags.forEach(t=>{
-    DATA.pushList.push({ id: uid(), tag:t, shed: pushBuildState.shed, farm: pushBuildState.farm, pushed:false });
+    const ref = db.collection('pushList').doc(uid());
+    batch.set(ref, { tag:t, shed: pushBuildState.shed, farm: pushBuildState.farm, pushed:false });
   });
-  toast(`${pushBuildState.selectedTags.size} added to the pushing list`);
+  batch.commit().then(()=>{
+    toast(`${count} added to the pushing list`);
+  }).catch(err=>toast('Error: '+err.message));
   pushBuildState.selectedTags = new Set();
-  save();
   renderPush();
 }
 function togglePushed(id){
   const item = DATA.pushList.find(p=>p.id===id);
   if(!item) return;
-  item.pushed = !item.pushed;
-  save();
-  renderPush();
+  db.collection('pushList').doc(id).update({pushed: !item.pushed}).catch(err=>toast('Error: '+err.message));
 }
 let pushClearConfirming = false;
 function clearPushList(){
@@ -1148,10 +1342,12 @@ function clearPushList(){
   renderPush();
 }
 function confirmClearPushList(){
-  DATA.pushList = [];
+  const batch = db.batch();
+  DATA.pushList.forEach(p=>{ batch.delete(db.collection('pushList').doc(p.id)); });
+  batch.commit().then(()=>{
+    toast('Pushing list cleared');
+  }).catch(err=>toast('Error: '+err.message));
   pushClearConfirming = false;
-  save();
-  toast('Pushing list cleared');
   renderPush();
 }
 function cancelClearPushList(){
@@ -1261,11 +1457,6 @@ function renderAll(){
   renderLookup();
   renderShare();
 }
-
-// init unit toggle state from storage
-document.getElementById('unitL').classList.toggle('active', DATA.unit==='L');
-document.getElementById('unitKg').classList.toggle('active', DATA.unit==='kg');
-renderAll();
 </script>
 </body>
 </html>
