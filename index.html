@@ -218,7 +218,24 @@
    Adjust these as feeding plans get confirmed (e.g. Hereford weaning length,
    keeper weaning decline). Everything else reads from here. */
 const CONFIG = {
-  keeper:  { rampStartL: 2, rampEndL: 7, rampDays: 8, weanDay: 58 }, // age(days) 1..8 ramps 2->7, flat at 7 until weanDay
+  keeper: {
+    // The real feed plan is a straight line between each of these points — any future
+    // change to the plan (instant, or ramped over N days, up or down) is just editing
+    // or adding {day, litres} points here. Two points on the same day = an instant jump.
+    // After the last point, the rate holds flat there indefinitely.
+    milestones: [
+      {day: 1,  litres: 2},
+      {day: 8,  litres: 7},
+      {day: 55, litres: 7},
+      {day: 65, litres: 4.5}
+    ],
+    // Manual wean (triggered by weight, not age — see the Wean button on Lookup).
+    // Same milestone approach, but after the last point it drops to zero rather than holding.
+    weanMilestones: [
+      {day: 0, litres: 4.5},
+      {day: 7, litres: 1}
+    ]
+  },
   bobby:   { day0L: 2, fullL: 4, overdueDays: 5 },                   // fed until Cleared or moved to Hereford mob — no hard cutoff. overdueDays just flags the pen.
   hereford:{ fullL: 7 },                                            // flat rate once moved into the mob (day after the move — they've already been fed that morning)
   gramsPerLitre: 150,
@@ -241,6 +258,7 @@ const firebaseConfig = {
 };
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
+auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL); // stay signed in until explicit sign out
 const db = firebase.firestore();
 
 /* ============ DATA (populated live from Firestore, never written to directly) ============ */
@@ -338,7 +356,13 @@ function detachListeners(){
 }
 
 /* ============ HELPERS ============ */
-function todayStr(){ return new Date().toISOString().slice(0,10); }
+function todayStr(){
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  const dd = String(d.getDate()).padStart(2,'0');
+  return `${yyyy}-${mm}-${dd}`;
+}
 function ageInDays(birthDateStr, onDate){
   const d0 = new Date(birthDateStr+'T00:00:00');
   const d1 = new Date((onDate||todayStr())+'T00:00:00');
@@ -357,18 +381,39 @@ function toast(msg){
 }
 
 /* ============ FEED CALCULATIONS ============ */
+// Draws a straight line between consecutive {day, litres} points. Two points on the
+// same day means an instant jump. Past the last point: 'hold' stays flat there,
+// 'zero' drops to nothing — this is how every feed-plan change gets expressed.
+function interpolateMilestones(milestones, age, afterBehavior){
+  if(age <= milestones[0].day) return milestones[0].litres;
+  for(let i=1;i<milestones.length;i++){
+    if(age <= milestones[i].day){
+      const prev = milestones[i-1], curr = milestones[i];
+      if(curr.day === prev.day) return curr.litres;
+      const frac = (age - prev.day) / (curr.day - prev.day);
+      return prev.litres + frac*(curr.litres - prev.litres);
+    }
+  }
+  return afterBehavior === 'zero' ? 0 : milestones[milestones.length-1].litres;
+}
+
 function litresForCalf(calf, onDate){
   const today = onDate || todayStr();
   if(calf.type === 'keeper'){
     const age = ageInDays(calf.birthDate, today);
     if(age < 0) return 0;
     if(age === 0) return 0; // colostrum day, excluded from forecast
-    if(age > CONFIG.keeper.weanDay) return 0; // weaned off
-    if(age <= CONFIG.keeper.rampDays){
-      const step = (CONFIG.keeper.rampEndL - CONFIG.keeper.rampStartL) / (CONFIG.keeper.rampDays - 1);
-      return CONFIG.keeper.rampStartL + (age-1)*step;
+
+    // Manual wean (triggered by weight, not age) overrides the normal curve entirely.
+    if(calf.weanDate){
+      const weanAge = ageInDays(calf.weanDate, today);
+      if(weanAge >= 0){
+        return interpolateMilestones(CONFIG.keeper.weanMilestones, weanAge, 'zero');
+      }
+      // weanAge < 0 shouldn't occur — fall through to the normal curve as a guard
     }
-    return CONFIG.keeper.rampEndL;
+
+    return interpolateMilestones(CONFIG.keeper.milestones, age, 'hold');
   }
   if(calf.type === 'bobby'){
     // Genuine D1/D2 bobbies and Hereford-origin calves alike — fed until Cleared
@@ -438,7 +483,7 @@ function renderToday(){
   const today = todayStr();
   const bobbies = DATA.calves.filter(c=>c.type==='bobby' && (!c.cleared || c.clearedDate===today) && ageInDays(c.birthDate,today) >= 0);
   const herefords = DATA.calves.filter(c=>c.type==='hereford' && ageInDays(c.moveDate,today) >= 0);
-  const keepers = DATA.calves.filter(c=>c.type==='keeper' && ageInDays(c.birthDate,today) >= 0 && ageInDays(c.birthDate,today) <= CONFIG.keeper.weanDay);
+  const keepers = DATA.calves.filter(c=>c.type==='keeper' && ageInDays(c.birthDate,today) >= 0);
 
   const bobbyTotal = bobbies.reduce((s,c)=>s+litresForCalf(c,today),0);
   const herefordTotal = herefords.reduce((s,c)=>s+litresForCalf(c,today),0);
@@ -500,7 +545,7 @@ function renderToday(){
         <div class="mob-card keeper">
           <div class="label">Keepers · ${keepers.length} head</div>
           <div class="amount">${fmtKeeper(keeperTotal)}</div>
-          <div class="sub">Rising plane: ${CONFIG.keeper.rampStartL}L on day 1 → ${CONFIG.keeper.rampEndL}L by day ${CONFIG.keeper.rampDays} · powder or milk</div>
+          <div class="sub">Ramps to ${CONFIG.keeper.milestones[1].litres}L by day ${CONFIG.keeper.milestones[1].day}, holds till day ${CONFIG.keeper.milestones[2].day}, settles at ${CONFIG.keeper.milestones[3].litres}L by day ${CONFIG.keeper.milestones[3].day} · powder or milk</div>
           ${shedRows}
         </div>
         <div class="mob-card bobby">
@@ -838,6 +883,35 @@ function doLookup(){
   const deaths = DATA.deaths.filter(d=>d.tag===val);
   const treatments = DATA.treatments.filter(t=>t.tags.includes(val));
   const note = calf.note || '';
+
+  let weanSection = '';
+  const weanDeclineDays = CONFIG.keeper.weanMilestones[CONFIG.keeper.weanMilestones.length-1].day;
+  const weanFromL = CONFIG.keeper.weanMilestones[0].litres;
+  const weanToL = CONFIG.keeper.weanMilestones[CONFIG.keeper.weanMilestones.length-1].litres;
+  if(calf.weanDate){
+    const weanAge = ageInDays(calf.weanDate);
+    const status = weanAge >= weanDeclineDays+1
+      ? 'Fully weaned off milk'
+      : `Weaning — day ${Math.max(weanAge,0)} of ${weanDeclineDays}`;
+    weanSection = `
+      <div class="card">
+        <h2>Weaning</h2>
+        <div class="sub">Started ${fmtDate(calf.weanDate)} · ${status}</div>
+        <div style="margin-top:10px;">
+          <button class="btn btn-outline" style="width:100%;" onclick="cancelWean('${calf.id}')">Cancel weaning</button>
+        </div>
+      </div>`;
+  } else {
+    weanSection = `
+      <div class="card">
+        <h2>Weaning</h2>
+        <p class="muted">Starts a ${weanDeclineDays}-day decline from ${weanFromL}L down to ${weanToL}L, then off milk entirely. Trigger this based on weight, not age.</p>
+        <div style="margin-top:10px;">
+          <button class="btn btn-primary" style="width:100%;" onclick="startWean('${calf.id}')">Start weaning</button>
+        </div>
+      </div>`;
+  }
+
   resultEl.innerHTML = `
     <div class="mob-card keeper">
       <div class="label">Tag #${calf.tag} · ${calf.farm}</div>
@@ -847,6 +921,7 @@ function doLookup(){
     </div>
     ${deaths.length ? `<div class="card" style="border-color:var(--danger);"><strong style="color:var(--danger);">Deceased</strong> — ${deaths[0].reason} on ${fmtDate(deaths[0].date)}</div>` : ''}
     ${treatments.length ? `<div class="card"><h2>Treatment history</h2>${treatments.map(t=>`<div class="list-item"><span>${t.treatmentType}</span><span class="meta">${fmtDate(t.startDate)}</span></div>`).join('')}</div>` : ''}
+    ${weanSection}
     <div class="card">
       <h2>Note</h2>
       <textarea id="noteInput-${calf.id}" maxlength="300" placeholder="e.g. slow to feed, watch closely">${note}</textarea>
@@ -867,6 +942,22 @@ function saveNote(calfId){
   const ta = document.getElementById('noteInput-'+calfId);
   db.collection('calves').doc(calfId).update({note: ta.value.trim()})
     .then(()=>toast('Note saved'))
+    .catch(err=>toast('Error: '+err.message));
+}
+function startWean(calfId){
+  const wm = CONFIG.keeper.weanMilestones;
+  const days = wm[wm.length-1].day;
+  const fromL = wm[0].litres;
+  const toL = wm[wm.length-1].litres;
+  if(!confirm(`Start weaning? This begins a ${days}-day decline from ${fromL}L to ${toL}L, then off milk.`)) return;
+  db.collection('calves').doc(calfId).update({weanDate: todayStr()})
+    .then(()=>toast('Weaning started'))
+    .catch(err=>toast('Error: '+err.message));
+}
+function cancelWean(calfId){
+  if(!confirm('Cancel weaning? This calf will go back to its normal feed rate.')) return;
+  db.collection('calves').doc(calfId).update({weanDate: null})
+    .then(()=>toast('Weaning cancelled'))
     .catch(err=>toast('Error: '+err.message));
 }
 
@@ -892,7 +983,7 @@ function genMilkSummary(){
   lines.push('Keepers');
   let keeperHead=0, keeperLitres=0;
   CONFIG.sheds.forEach(s=>{
-    const shedCalves = DATA.calves.filter(c=>c.type==='keeper' && c.shed===s && ageInDays(c.birthDate,today)>=0 && ageInDays(c.birthDate,today)<=CONFIG.keeper.weanDay);
+    const shedCalves = DATA.calves.filter(c=>c.type==='keeper' && c.shed===s && ageInDays(c.birthDate,today)>=0);
     const l = shedCalves.reduce((sum,c)=>sum+litresForCalf(c,today),0);
     keeperHead += shedCalves.length; keeperLitres += l;
     lines.push(shedName(s)+' - '+shedCalves.length+' head - '+fmtKeeper(l));
@@ -922,7 +1013,7 @@ function genCalfTotals(){
   const bobbyHF = DATA.calves.filter(c=>c.type==='bobby' && c.farm==='HF').length;
   const allHerefords = DATA.calves.filter(c=>c.type==='hereford').length;
   const movedToday = DATA.calves.filter(c=>c.type==='hereford' && c.moveDate===today).length;
-  const activeKeepers = allKeepers.filter(c=>ageInDays(c.birthDate,today)<=CONFIG.keeper.weanDay).length;
+  const activeKeepers = allKeepers.filter(c=>ageInDays(c.birthDate,today)>=0).length;
   const activeBobbies = DATA.calves.filter(c=>c.type==='bobby' && (!c.cleared || c.clearedDate===today)).length;
   const activeHerefords = DATA.calves.filter(c=>c.type==='hereford' && ageInDays(c.moveDate,today)>=0).length;
 
@@ -1396,7 +1487,7 @@ function renderPush(){
   if(shed && farm){
     const alreadyOnList = new Set(DATA.pushList.filter(p=>!p.pushed && p.shed===shed && p.farm===farm).map(p=>p.tag));
     const candidates = DATA.calves.filter(c=>c.type==='keeper' && c.shed===shed && c.farm===farm
-      && ageInDays(c.birthDate,today) >= 0 && ageInDays(c.birthDate,today) <= CONFIG.keeper.weanDay
+      && ageInDays(c.birthDate,today) >= 0 && litresForCalf(c,today) > 0
       && !alreadyOnList.has(c.tag));
     candidates.sort((a,b)=>a.tag-b.tag);
     addSection += `
