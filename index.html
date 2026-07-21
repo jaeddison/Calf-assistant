@@ -1,1641 +1,1553 @@
+<!-- © 2026 James Eddison. All rights reserved. Unauthorised copying, modification, or distribution of this software is prohibited. -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="Dairy">
-<title>Dairy Assistant</title>
-<!-- © 2026 James Eddison. All rights reserved. Unauthorised copying, modification, or distribution of this software is prohibited. -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Calf Assistant</title>
+<link rel="icon" href="icon.png" type="image/png">
 <link rel="apple-touch-icon" href="icon.png">
-<link rel="icon" type="image/png" href="icon.png">
+<meta name="theme-color" content="#33472F">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Calf Assistant">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-
-<!-- Firebase -->
-<script type="module">
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, browserLocalPersistence, setPersistence }
-  from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
-import { getFirestore, doc, onSnapshot, setDoc, getDoc }
-  from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
-
-const firebaseConfig = {
-  apiKey: "AIzaSyDAt7Pj1FwsFHpnOIxUvP83FDKn4Tq5r8c",
-  authDomain: "calf-assistant.firebaseapp.com",
-  projectId: "calf-assistant",
-  storageBucket: "calf-assistant.firebasestorage.app",
-  messagingSenderId: "848244954361",
-  appId: "1:848244954361:web:a757848d5bb81e21363e28"
-};
-
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-setPersistence(auth, browserLocalPersistence).catch(e => console.warn('Persistence error:', e));
-const db = getFirestore(app);
-const DATA_DOC = doc(db, 'dairy', 'D1');
-const GRAZE_DOC = doc(db, 'dairy', 'D1-graze');
-
-// ── Expose to window for non-module code
-window._auth = auth;
-window._db = db;
-window._DATA_DOC = DATA_DOC;
-window._GRAZE_DOC = GRAZE_DOC;
-window._signInWithEmailAndPassword = signInWithEmailAndPassword;
-window._signOut = signOut;
-window._onAuthStateChanged = onAuthStateChanged;
-window._onSnapshot = onSnapshot;
-window._setDoc = setDoc;
-window._getDoc = getDoc;
-
-onAuthStateChanged(auth, user => {
-  if (user) {
-    document.getElementById('loginScreen').style.display = 'none';
-    document.getElementById('appScreen').style.display = 'block';
-    document.getElementById('userEmail').textContent = user.email;
-    window.startFirestoreSync();
-  } else {
-    document.getElementById('loginScreen').style.display = 'flex';
-    document.getElementById('appScreen').style.display = 'none';
-    if (window._unsubscribe) window._unsubscribe();
-  }
-});
-</script>
-
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore-compat.js"></script>
 <style>
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-:root{
-  --bg:#f5f0e8;--surface:#fffdf7;--border:#c8b89a;
-  --text:#2c2416;--muted:#7a6a52;--accent:#5c3d1e;
-  --green:#3a6b3a;--red:#8b2020;--amber:#b87d1a;
-}
-body{background:var(--bg);font-family:'Libre Baskerville',Georgia,serif;color:var(--text);min-height:100vh}
+  :root{
+    --bg:#F5F1E6;
+    --surface:#FFFFFF;
+    --ink:#2B2B23;
+    --ink-soft:#7A7464;
+    --forest:#33472F;
+    --forest-dark:#25331F;
+    --keeper:#4F7942;
+    --keeper-soft:#E4ECDF;
+    --bobby:#5C7A89;
+    --bobby-soft:#E3EAEC;
+    --hereford:#C1622D;
+    --hereford-soft:#F5E1D3;
+    --amber:#D98E2B;
+    --amber-soft:#FBEED9;
+    --danger:#B23A2E;
+    --danger-soft:#F5DFDA;
+    --line:#E2DCC9;
+    --radius:14px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:'Inter',system-ui,sans-serif;-webkit-tap-highlight-color:transparent;}
+  h1,h2,h3{font-family:'Fraunces',serif;font-weight:600;margin:0;}
+  .app{max-width:520px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;padding-bottom:78px;}
 
-/* ── Login ── */
-#loginScreen{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
-.login-box{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:32px 24px;width:100%;max-width:360px}
-.login-box h1{font-size:1.4rem;color:var(--accent);margin-bottom:6px}
-.login-box p{font-size:.78rem;color:var(--muted);margin-bottom:24px;font-family:'JetBrains Mono',monospace}
-.login-field{display:flex;flex-direction:column;margin-bottom:14px}
-.login-field label{font-size:.65rem;font-family:'JetBrains Mono',monospace;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
-.login-field input{padding:10px;border:1px solid var(--border);border-radius:3px;background:var(--bg);font-family:'JetBrains Mono',monospace;font-size:.85rem;color:var(--text);outline:none}
-.login-field input:focus{border-color:var(--accent)}
-.login-err{font-size:.72rem;color:var(--red);font-family:'JetBrains Mono',monospace;margin-bottom:10px;min-height:16px}
-#appScreen{display:none}
+  header.top{background:var(--forest);color:#F5F1E6;padding:18px 18px 16px;position:sticky;top:0;z-index:10;}
+  header.top .eyebrow{font-size:11px;letter-spacing:.14em;text-transform:uppercase;opacity:.65;margin-bottom:2px;}
+  header.top h1{font-size:22px;color:#fff;}
+  header.top .unit-toggle{position:absolute;right:16px;top:18px;display:flex;background:rgba(255,255,255,.12);border-radius:20px;padding:3px;}
+  header.top .unit-toggle button{border:none;background:transparent;color:#F5F1E6;font-size:12px;font-weight:600;padding:6px 10px;border-radius:16px;cursor:pointer;}
+  header.top .unit-toggle button.active{background:var(--amber);color:#2B2B23;}
 
-/* ── App ── */
-.app{max-width:860px;margin:0 auto;padding:20px 14px 80px}
-.header{border-bottom:2px solid var(--accent);padding-bottom:12px;margin-bottom:20px}
-.header h1{font-size:1.5rem;letter-spacing:.02em}
-.header-meta{display:flex;justify-content:space-between;align-items:center;margin-top:4px}
-.header p{font-family:'JetBrains Mono',monospace;font-size:.68rem;color:var(--muted)}
-.save-status{font-size:.62rem;font-family:'JetBrains Mono',monospace;color:var(--green);min-height:13px}
-.signout-btn{background:none;border:1px solid var(--border);border-radius:3px;padding:3px 8px;font-family:'JetBrains Mono',monospace;font-size:.62rem;color:var(--muted);cursor:pointer}
-.signout-btn:active{color:var(--red);border-color:var(--red)}
-.tabs{display:flex;margin-bottom:18px;border-bottom:2px solid var(--border)}
-.tab{background:none;border:none;cursor:pointer;font-family:'Libre Baskerville',serif;font-size:.68rem;color:var(--muted);padding:8px 4px 10px;border-bottom:2px solid transparent;margin-bottom:-2px;white-space:nowrap;transition:color .15s,border-color .15s;flex:1;text-align:center;min-width:0}
-.tab.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:700}
-.tab:hover:not(.active){color:var(--text)}
-.card{background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:16px;margin-bottom:14px}
-.card h2{font-size:.95rem;margin-bottom:14px;color:var(--accent);border-bottom:1px solid var(--border);padding-bottom:8px}
-.bay-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px}
-.bay-cell{background:var(--bg);border:1px solid var(--border);border-radius:3px;padding:12px 8px;text-align:center;cursor:pointer}
-.bay-name{font-size:.65rem;color:var(--muted);font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.05em}
-.bay-count{font-size:1.9rem;font-weight:700;color:var(--accent);line-height:1.1;margin-top:2px}
-.bay-cell.total{background:var(--accent);border-color:var(--accent);cursor:default}
-.bay-cell.total .bay-name{color:rgba(255,255,255,.7)}
-.bay-cell.total .bay-count{color:#fff}
-table{width:100%;border-collapse:collapse;font-size:.8rem}
-th{font-family:'JetBrains Mono',monospace;font-size:.64rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);padding:6px 6px;border-bottom:1px solid var(--border);text-align:left}
-td{padding:7px 6px;border-bottom:1px solid #e8dfc8;vertical-align:middle}
-tr:last-child td{border-bottom:none}
-tr.archived-row td{color:var(--muted);font-style:italic}
-.tag{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:.88rem}
-.badge{display:inline-block;padding:2px 6px;border-radius:2px;font-size:.66rem;font-family:'JetBrains Mono',monospace}
-.badge.green{background:#e8f3e8;color:var(--green);border:1px solid #b8d8b8}
-.badge.amber{background:#fef3e0;color:var(--amber);border:1px solid #f0d090}
-.badge.red{background:#fce8e8;color:var(--red);border:1px solid #e8b8b8}
-.empty{text-align:center;color:var(--muted);font-style:italic;font-size:.82rem;padding:18px 0}
-.form-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;align-items:flex-end;border-top:1px dashed var(--border);padding-top:14px}
-.field{display:flex;flex-direction:column}
-.field label{font-size:.65rem;font-family:'JetBrains Mono',monospace;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
-input,select{background:var(--bg);border:1px solid var(--border);border-radius:3px;padding:7px 8px;font-family:'JetBrains Mono',monospace;font-size:.8rem;color:var(--text);outline:none;-webkit-appearance:none}
-input:focus,select:focus{border-color:var(--accent)}
-.btn{background:var(--accent);color:#fff;border:none;border-radius:3px;padding:8px 14px;font-family:'Libre Baskerville',serif;font-size:.8rem;cursor:pointer;align-self:flex-end}
-.btn:active{background:#3d2810}
-.btn.sec{background:none;color:var(--muted);border:1px solid var(--border)}
-.btn.sec:active{color:var(--text)}
-.btn.full{width:100%}
-.del{background:none;border:none;cursor:pointer;color:#c8a888;font-size:.9rem;padding:3px 5px}
-.del:active{color:var(--red)}
-.foot-btns{display:flex;gap:6px;flex-wrap:wrap}
-.foot-btn{background:var(--bg);border:1px solid var(--border);border-radius:3px;padding:6px 10px;font-family:'JetBrains Mono',monospace;font-size:.72rem;color:var(--muted);cursor:pointer;transition:all .15s}
-.foot-btn.selected{background:var(--amber);border-color:var(--amber);color:#fff;font-weight:600}
-.treat-btn{background:none;border:1px solid var(--border);border-radius:3px;padding:4px 8px;font-family:'JetBrains Mono',monospace;font-size:.68rem;color:var(--muted);cursor:pointer;transition:all .2s}
-.treat-btn.pending{background:#f5ede0;border-color:var(--amber);color:var(--amber);font-weight:600}
-.treat-btn.confirmed{background:var(--green);border-color:var(--green);color:#fff;font-weight:600}
-.mineral-calc{background:#f0f4ee;border:1px solid #c8d8c0;border-radius:3px;padding:10px 12px;margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:.72rem;color:var(--text)}
-.mineral-calc .mineral-title{font-size:.62rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:6px}
-.mineral-row{display:flex;justify-content:space-between;padding:2px 0}
-.mineral-row .mineral-label{color:var(--muted)}
-.mineral-row .mineral-value{font-weight:600;color:var(--green)}
-.mineral-divider{border:none;border-top:1px dashed #c8d8c0;margin:6px 0}
-.graze-calc{background:var(--bg);border:1px solid var(--border);border-radius:3px;padding:10px 12px;margin-top:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
-.graze-calc label{font-family:'JetBrains Mono',monospace;font-size:.66rem;text-transform:uppercase;color:var(--muted)}
-.graze-calc input{width:70px;padding:5px 7px;font-family:'JetBrains Mono',monospace;font-size:.8rem;background:var(--surface);border:1px solid var(--border);border-radius:3px;color:var(--text);outline:none}
-.graze-calc input:focus{border-color:var(--accent)}
-.graze-result{font-family:'JetBrains Mono',monospace;font-size:.78rem;color:var(--accent);font-weight:600}
-.graze-result span{color:var(--muted);font-weight:400;font-size:.68rem;margin-left:4px}
-.export-box{background:var(--bg);border:1px solid var(--border);border-radius:3px;padding:12px;font-family:'JetBrains Mono',monospace;font-size:.66rem;white-space:pre-wrap;color:var(--muted);max-height:280px;overflow-y:auto;margin-top:14px;word-break:break-all}
-.hidden{display:none}
-/* Bay modal */
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;display:flex;align-items:center;justify-content:center}
-.modal{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:24px;width:260px;box-shadow:0 8px 32px rgba(0,0,0,.2)}
-.modal h3{font-size:1rem;color:var(--accent);margin-bottom:16px}
-.modal input{width:100%;font-size:1.4rem;text-align:center;padding:10px;border:1px solid var(--border);border-radius:3px;background:var(--bg);font-family:'JetBrains Mono',monospace;color:var(--text);outline:none}
-.modal input:focus{border-color:var(--accent)}
-.modal-btns{display:flex;gap:8px;margin-top:16px}
-.modal-btns .btn{flex:1;text-align:center}
-.sync-indicator{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--amber);margin-right:6px;vertical-align:middle}
-.sync-indicator.live{background:var(--green)}
+  main{flex:1;padding:16px;}
+  .screen{display:none;animation:fade .18s ease;}
+  .screen.active{display:block;}
+  @keyframes fade{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:translateY(0);}}
+
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin-bottom:14px;overflow:hidden;}
+  .card h2{font-size:16px;margin-bottom:10px;}
+  .muted{color:var(--ink-soft);font-size:13px;}
+
+  /* Today screen */
+  .mob-card{border-radius:var(--radius);padding:16px;margin-bottom:12px;position:relative;overflow:hidden;}
+  .mob-card.keeper{background:var(--keeper-soft);}
+  .mob-card.bobby{background:var(--bobby-soft);}
+  .mob-card.hereford{background:var(--hereford-soft);}
+  .mob-card .label{font-size:12px;text-transform:uppercase;letter-spacing:.08em;font-weight:700;opacity:.75;}
+  .mob-card .amount{font-family:'Fraunces',serif;font-size:32px;font-weight:600;margin-top:2px;}
+  .mob-card .sub{font-size:12px;color:var(--ink-soft);margin-top:2px;}
+  .curve{display:flex;gap:2px;margin-top:10px;height:20px;align-items:flex-end;}
+  .curve i{flex:1;background:currentColor;opacity:.25;border-radius:2px 2px 0 0;}
+  .curve i.now{opacity:.9;}
+  .shed-row{display:flex;justify-content:space-between;font-size:13px;padding:6px 0;border-top:1px dashed rgba(0,0,0,.08);}
+  .shed-row:first-of-type{border-top:none;margin-top:8px;}
+  .grand-total{display:flex;justify-content:space-between;align-items:baseline;background:var(--forest);color:#fff;border-radius:var(--radius);padding:16px;margin-top:4px;}
+  .grand-total .amount{font-family:'Fraunces',serif;font-size:26px;}
+
+  /* Buttons */
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:none;border-radius:10px;padding:12px 16px;font-size:14px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer;}
+  .btn-primary{background:var(--forest);color:#fff;width:100%;}
+  .btn-amber{background:var(--amber);color:#2B2B23;width:100%;}
+  .btn-outline{background:transparent;border:1px solid var(--line);color:var(--ink);}
+  .btn-danger{background:var(--danger-soft);color:var(--danger);}
+  .btn-sm{padding:8px 12px;font-size:12px;border-radius:8px;}
+  .btn:disabled{opacity:.4;}
+  .btn-row{display:flex;gap:8px;flex-wrap:wrap;}
+
+  .type-picker{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;}
+  .type-picker button{padding:16px 6px;border-radius:12px;border:2px solid var(--line);background:#fff;font-family:'Fraunces',serif;font-weight:600;font-size:14px;cursor:pointer;color:var(--ink);}
+  .type-picker button.keeper.selected{border-color:var(--keeper);background:var(--keeper-soft);}
+  .type-picker button.bobby.selected{border-color:var(--bobby);background:var(--bobby-soft);}
+  .type-picker button.hereford.selected{border-color:var(--hereford);background:var(--hereford-soft);}
+
+  input[type=number],input[type=text],input[type=date],select,textarea{width:100%;padding:11px 12px;border-radius:10px;border:1px solid var(--line);font-size:15px;font-family:'Inter',sans-serif;background:#fff;color:var(--ink);box-sizing:border-box;min-width:0;}
+  input[type=date]{-webkit-appearance:none;appearance:none;}
+  label{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-soft);font-weight:600;display:block;margin-bottom:6px;margin-top:12px;}
+  label:first-child{margin-top:0;}
+
+  .farm-picker{display:flex;gap:8px;}
+  .farm-picker button{flex:1;padding:12px;border-radius:10px;border:2px solid var(--line);background:#fff;font-weight:700;cursor:pointer;}
+  .farm-picker button.selected{border-color:var(--forest);background:var(--forest);color:#fff;}
+
+  .tag-grid{display:flex;flex-wrap:wrap;gap:6px;max-height:220px;overflow-y:auto;padding:10px;border:1px solid var(--line);border-radius:10px;background:#FCFAF4;margin-top:6px;}
+  .tag-chip{padding:7px 10px;border-radius:8px;border:1px solid var(--line);background:#fff;font-size:13px;font-weight:600;cursor:pointer;}
+  .tag-chip.selected{background:var(--keeper);border-color:var(--keeper);color:#fff;}
+  .tag-chip.used{opacity:.3;pointer-events:none;text-decoration:line-through;}
+
+  .shed-picker{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+  .shed-picker button{padding:10px 4px;border-radius:10px;border:2px solid var(--line);background:#fff;font-weight:700;font-size:12px;line-height:1.25;cursor:pointer;white-space:normal;}
+  .shed-picker button.selected{border-color:var(--keeper);background:var(--keeper-soft);}
+
+  .list-item{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--line);font-size:14px;}
+  .list-item:last-child{border-bottom:none;}
+  .list-item .meta{color:var(--ink-soft);font-size:12px;}
+  .pill{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;}
+  .pill.keeper{background:var(--keeper-soft);color:var(--keeper);}
+  .pill.bobby{background:var(--bobby-soft);color:var(--bobby);}
+  .pill.hereford{background:var(--hereford-soft);color:var(--hereford);}
+
+  .empty{text-align:center;padding:30px 10px;color:var(--ink-soft);font-size:14px;}
+
+  .treat-card{border-left:4px solid var(--amber);background:var(--amber-soft);border-radius:10px;padding:12px 14px;margin-bottom:10px;}
+  .treat-card .top-row{display:flex;justify-content:space-between;align-items:baseline;}
+  .treat-card h3{font-size:15px;}
+  .treat-card .day-count{font-size:12px;font-weight:700;color:var(--forest);}
+  .tag-list{display:flex;flex-wrap:wrap;gap:5px;margin:8px 0;}
+  .tag-list span{background:#fff;border:1px solid var(--line);border-radius:6px;padding:3px 7px;font-size:12px;font-weight:600;}
+  .tag-list span button{border:none;background:none;color:var(--danger);cursor:pointer;font-weight:700;margin-left:4px;padding:0;}
+
+  nav.bottom{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--line);display:flex;max-width:520px;margin:0 auto;z-index:20;}
+  nav.bottom button{flex:1;background:none;border:none;padding:8px 1px 10px;font-size:9.5px;font-weight:600;color:var(--ink-soft);cursor:pointer;font-family:'Inter',sans-serif;border-top:2px solid transparent;letter-spacing:0;}
+  nav.bottom button.active{color:var(--forest);border-top:2px solid var(--forest);}
+
+  .toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--forest-dark);color:#fff;padding:10px 18px;border-radius:20px;font-size:13px;font-weight:600;z-index:50;opacity:0;pointer-events:none;transition:opacity .2s;}
+  .toast.show{opacity:1;}
+
+  .section-toggle{display:flex;justify-content:space-between;align-items:center;cursor:pointer;}
+  .section-toggle .chev{transition:transform .15s;}
+  .section-toggle.open .chev{transform:rotate(180deg);}
+  .collapsible{max-height:0;overflow:hidden;transition:max-height .2s ease;}
+  .collapsible.open{max-height:2000px;}
+
+  textarea{min-height:70px;resize:vertical;}
+
+  /* Login screen */
+  #loginScreen{max-width:400px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;justify-content:center;padding:24px;}
+  #loginScreen h1{font-size:26px;color:var(--forest);margin-bottom:6px;}
+  #loginScreen p.sub{color:var(--ink-soft);font-size:14px;margin-bottom:20px;}
+  #loginError{color:var(--danger);font-size:13px;margin-top:10px;min-height:18px;}
+  #logoutBtn{background:rgba(255,255,255,.12);border:none;color:#F5F1E6;font-size:11px;padding:5px 10px;border-radius:8px;cursor:pointer;margin-top:8px;}
 </style>
 </head>
 <body>
-
-<!-- ── LOGIN SCREEN ── -->
 <div id="loginScreen">
-  <div class="login-box">
-    <h1>🐄 Dairy Assistant</h1>
-    <p>D1 — Driffield Farming Ltd</p>
-    <div class="login-field">
-      <label>Email</label>
-      <input type="email" id="loginEmail" placeholder="you@example.com" autocomplete="email">
-    </div>
-    <div class="login-field">
-      <label>Password</label>
-      <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password">
-    </div>
-    <div class="login-err" id="loginErr"></div>
-    <button class="btn full" onclick="doSignIn()">Sign In</button>
+  <h1>Calf Assistant</h1>
+  <p class="sub">Sign in to continue.</p>
+  <label>Email</label>
+  <input type="email" id="loginEmail" placeholder="you@example.com" autocomplete="username">
+  <label>Password</label>
+  <input type="password" id="loginPassword" placeholder="Password" autocomplete="current-password">
+  <div style="margin-top:16px;">
+    <button class="btn btn-primary" style="width:100%;" onclick="login()">Sign in</button>
   </div>
+  <div id="loginError"></div>
 </div>
+<div class="app" style="display:none;">
+  <header class="top">
+    <div class="eyebrow" id="headerEyebrow">Calf Assistant</div>
+    <h1 id="headerTitle">Today</h1>
+    <button id="logoutBtn" onclick="logout()">Sign out</button>
+    <div class="unit-toggle">
+      <button id="unitL" class="active" onclick="setUnit('L')">L</button>
+      <button id="unitKg" onclick="setUnit('kg')">kg</button>
+    </div>
+    <div style="position:absolute;right:16px;top:46px;font-size:9px;opacity:.55;text-transform:uppercase;letter-spacing:.05em;">keepers only</div>
+  </header>
 
-<!-- ── APP SCREEN ── -->
-<div id="appScreen">
-<div class="app">
-  <div class="header">
-    <h1>🐄 Dairy Assistant</h1>
-    <div class="header-meta">
-      <p><span class="sync-indicator" id="syncDot"></span><span id="saveStatus">Connecting…</span></p>
-      <div style="display:flex;align-items:center;gap:8px">
-        <span style="font-family:'JetBrains Mono',monospace;font-size:.62rem;color:var(--muted)" id="userEmail"></span>
-        <button class="signout-btn" onclick="doSignOut()">Sign out</button>
-      </div>
-    </div>
-  </div>
+  <main>
+    <!-- TODAY -->
+    <section class="screen active" id="screen-today"></section>
 
-  <div class="tabs">
-    <button class="tab active" onclick="showTab(0)">Bays</button>
-    <button class="tab" onclick="showTab(1)">Dry Cow</button>
-    <button class="tab" onclick="showTab(2)">Lame</button>
-    <button class="tab" onclick="showTab(3)">Calving</button>
-    <button class="tab" onclick="showTab(4)">Fresh Cows</button>
-    <button class="tab" onclick="showTab(5)">Export</button>
-  </div>
+    <!-- BIRTHS -->
+    <section class="screen" id="screen-births"></section>
 
-  <!-- TAB 0: BAYS -->
-  <div id="tab0">
-    <div class="card">
-      <h2>Headcounts by Bay</h2>
-      <div class="bay-grid" id="bayGrid"></div>
-      <p style="font-size:.72rem;color:var(--muted);margin-top:12px;font-style:italic;text-align:center">Tap any bay to update its count</p>
-    </div>
-  </div>
+    <!-- TREATMENTS -->
+    <section class="screen" id="screen-treatments"></section>
 
-  <!-- TAB 1: DRY COW -->
-  <div id="tab1" class="hidden">
-    <div class="card">
-      <h2>Dry Cow Treatments &amp; Meat Withholding</h2>
-      <div id="txTable"></div>
-      <div class="form-row">
-        <div class="field"><label>Tag #</label><input id="txTag" placeholder="1234" style="width:70px"></div>
-        <div class="field"><label>Location</label><select id="txLoc"></select></div>
-        <div class="field"><label>Treatment / Reason</label><input id="txReason" placeholder="Penicillin" style="width:130px"></div>
-        <div class="field"><label>Meat Withhold Date</label><input type="date" id="txDate"></div>
-        <button class="btn" onclick="addTreatment()">Add</button>
-      </div>
-    </div>
-  </div>
+    <!-- DEATHS -->
+    <section class="screen" id="screen-deaths"></section>
 
-  <!-- TAB 2: LAME -->
-  <div id="tab2" class="hidden">
-    <div class="card">
-      <h2>Lame Cow Register</h2>
-      <p style="font-size:.75rem;color:var(--muted);margin-bottom:12px;font-style:italic">Tap foot buttons to select affected feet. Multiple selection allowed.</p>
-      <div id="lameTable"></div>
-      <div class="form-row">
-        <div class="field"><label>Tag #</label><input id="lameTag" placeholder="1234" style="width:80px"></div>
-        <div class="field"><label>Location</label><select id="lameLoc"></select></div>
-        <div class="field">
-          <label>Affected Foot(s)</label>
-          <div class="foot-btns">
-            <button class="foot-btn" onclick="toggleFoot('LF')">Left Front</button>
-            <button class="foot-btn" onclick="toggleFoot('RF')">Right Front</button>
-            <button class="foot-btn" onclick="toggleFoot('LR')">Left Rear</button>
-            <button class="foot-btn" onclick="toggleFoot('RR')">Right Rear</button>
-          </div>
-        </div>
-        <div class="field"><label>Notes</label><input id="lameNotes" placeholder="Optional" style="width:130px"></div>
-        <button class="btn" onclick="addLame()">Add</button>
-      </div>
-    </div>
-    <div class="card hidden" id="lameArchiveCard">
-      <h2>Treated &amp; Cleared</h2>
-      <div id="lameArchiveTable"></div>
-    </div>
-  </div>
+    <!-- LOOKUP -->
+    <section class="screen" id="screen-lookup"></section>
 
-  <!-- TAB 3: CALVING -->
-  <div id="tab3" class="hidden">
+    <!-- BOBBIES -->
+    <section class="screen" id="screen-bobbies"></section>
 
-    <!-- Watch List -->
-    <div class="card">
-      <h2>Watch List <span id="watchCount" style="font-size:.75rem;color:var(--muted);font-weight:400"></span></h2>
-      <p style="font-size:.75rem;color:var(--muted);margin-bottom:12px;font-style:italic">Cows to keep an eye on. Tap status then Add.</p>
-      <div id="watchTable"></div>
-      <div class="form-row">
-        <div class="field">
-          <label>Bay — tap to add</label>
-          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:2px">
-            <button class="foot-btn" id="wb-1" onclick="addToWatchBay('Bay 1')">1</button>
-            <button class="foot-btn" id="wb-2" onclick="addToWatchBay('Bay 2')">2</button>
-            <button class="foot-btn" id="wb-3" onclick="addToWatchBay('Bay 3')">3</button>
-            <button class="foot-btn" id="wb-4" onclick="addToWatchBay('Bay 4')">4</button>
-            <button class="foot-btn" id="wb-5" onclick="addToWatchBay('Bay 5')">5</button>
-            <button class="foot-btn" id="wb-6" onclick="addToWatchBay('Bay 6')">6</button>
-            <button class="foot-btn" id="wb-P" onclick="addToWatchBay('Penicillin Paddock')">P</button>
-          </div>
-        </div>
-        <div class="field">
-          <label>Status</label>
-          <div style="display:flex;gap:6px;margin-top:2px;flex-wrap:wrap">
-            <button class="foot-btn" id="ws-Calving" onclick="pickWatchStatus('Calving')">Calving</button>
-            <button class="foot-btn" id="ws-Close" onclick="pickWatchStatus('Close')">Close</button>
-            <button class="foot-btn" id="ws-Other" onclick="pickWatchStatus('Other')">Other</button>
-          </div>
-        </div>
-        <div class="field">
-          <label>Tag #</label>
-          <div style="display:flex;gap:6px;align-items:center">
-            <input id="watchTag" placeholder="1234" style="width:90px" inputmode="numeric" pattern="[0-9]*" type="text" autocomplete="off">
-            <button class="btn" onclick="submitWatch()" style="align-self:auto;padding:7px 12px">Add</button>
-          </div>
-        </div>
-      </div>
-    </div>
+    <!-- PUSH -->
+    <section class="screen" id="screen-push"></section>
 
-    <!-- Calf Tally -->
-    <div class="card">
-      <h2>Calf Tally <span style="font-size:.72rem;color:var(--muted);font-weight:400">— scratchpad, not saved</span></h2>
-      <div style="display:flex;gap:12px;justify-content:space-around;margin-top:4px;flex-wrap:wrap">
-        <div style="text-align:center">
-          <div style="font-family:'JetBrains Mono',monospace;font-size:.68rem;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Heifer</div>
-          <div style="font-family:'Libre Baskerville',serif;font-size:2.2rem;font-weight:700;color:var(--accent);line-height:1" id="tallyH">0</div>
-          <div style="display:flex;gap:6px;justify-content:center;margin-top:8px">
-            <button onclick="tallyDec('H')" style="background:var(--bg);border:1px solid var(--border);border-radius:3px;width:36px;height:36px;font-size:1.2rem;cursor:pointer;color:var(--muted)">−</button>
-            <button onclick="tallyInc('H')" style="background:var(--accent);border:none;border-radius:3px;width:36px;height:36px;font-size:1.2rem;cursor:pointer;color:#fff">+</button>
-          </div>
-        </div>
-        <div style="text-align:center">
-          <div style="font-family:'JetBrains Mono',monospace;font-size:.68rem;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Bull</div>
-          <div style="font-family:'Libre Baskerville',serif;font-size:2.2rem;font-weight:700;color:var(--accent);line-height:1" id="tallyB">0</div>
-          <div style="display:flex;gap:6px;justify-content:center;margin-top:8px">
-            <button onclick="tallyDec('B')" style="background:var(--bg);border:1px solid var(--border);border-radius:3px;width:36px;height:36px;font-size:1.2rem;cursor:pointer;color:var(--muted)">−</button>
-            <button onclick="tallyInc('B')" style="background:var(--accent);border:none;border-radius:3px;width:36px;height:36px;font-size:1.2rem;cursor:pointer;color:#fff">+</button>
-          </div>
-        </div>
-        <div style="text-align:center">
-          <div style="font-family:'JetBrains Mono',monospace;font-size:.68rem;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Hereford</div>
-          <div style="font-family:'Libre Baskerville',serif;font-size:2.2rem;font-weight:700;color:var(--accent);line-height:1" id="tallyHF">0</div>
-          <div style="display:flex;gap:6px;justify-content:center;margin-top:8px">
-            <button onclick="tallyDec('HF')" style="background:var(--bg);border:1px solid var(--border);border-radius:3px;width:36px;height:36px;font-size:1.2rem;cursor:pointer;color:var(--muted)">−</button>
-            <button onclick="tallyInc('HF')" style="background:var(--accent);border:none;border-radius:3px;width:36px;height:36px;font-size:1.2rem;cursor:pointer;color:#fff">+</button>
-          </div>
-        </div>
-      </div>
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;padding-top:10px;border-top:1px dashed var(--border)">
-        <span style="font-family:'JetBrains Mono',monospace;font-size:.72rem;color:var(--muted)">Total: <strong id="tallyTotal" style="color:var(--accent)">0</strong></span>
-        <button onclick="tallyReset()" class="btn sec" style="padding:5px 12px;font-size:.75rem">Reset</button>
-      </div>
-    </div>
+    <!-- SHARE -->
+    <section class="screen" id="screen-share"></section>
+  </main>
 
-    <!-- Calved List -->
-    <div class="card">
-      <h2>Calved <span id="calvedCount" style="font-size:.75rem;color:var(--muted);font-weight:400"></span></h2>
-      <p style="font-size:.75rem;color:var(--muted);margin-bottom:10px;font-style:italic">Record calf details then move cow to Fresh Cows.</p>
-      <div id="calvedTable"></div>
-      <div style="margin-top:10px" id="calvedClearBtn"></div>
-      <!-- Direct entry -->
-      <div class="form-row">
-        <div class="field">
-          <label>Bay</label>
-          <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:2px">
-            <button class="foot-btn" id="db-1" onclick="pickDirectBay('Bay 1')">1</button>
-            <button class="foot-btn" id="db-2" onclick="pickDirectBay('Bay 2')">2</button>
-            <button class="foot-btn" id="db-3" onclick="pickDirectBay('Bay 3')">3</button>
-            <button class="foot-btn" id="db-4" onclick="pickDirectBay('Bay 4')">4</button>
-            <button class="foot-btn" id="db-5" onclick="pickDirectBay('Bay 5')">5</button>
-            <button class="foot-btn" id="db-6" onclick="pickDirectBay('Bay 6')">6</button>
-            <button class="foot-btn" id="db-P" onclick="pickDirectBay('Penicillin Paddock')">P</button>
-          </div>
-        </div>
-        <div class="field">
-          <label>Date</label>
-          <input type="date" id="directCalvedDate">
-        </div>
-        <div class="field">
-          <label>Tag #</label>
-          <div style="display:flex;gap:6px;align-items:center">
-            <input id="directCalvedTag" placeholder="1234" style="width:90px" inputmode="numeric" pattern="[0-9]*" type="text" autocomplete="off">
-            <button class="btn" onclick="addDirectCalved()" style="align-self:auto;padding:7px 12px">Add</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Calving History -->
-    <div class="card">
-      <h2>Calving History</h2>
-      <div id="calvingHistory"></div>
-    </div>
-
-  </div>
-
-  <!-- TAB 4: FRESH COWS -->
-  <div id="tab4" class="hidden">
-    <div class="card" style="background:var(--bg);border-color:var(--border)">
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <div>
-          <div style="font-family:'JetBrains Mono',monospace;font-size:.68rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)">Mineral requirements</div>
-          <div style="font-size:.78rem;color:var(--muted);margin-top:2px">New Moms · Colostrum · Milking Herd</div>
-        </div>
-        <button class="btn" onclick="copyMinerals()" style="padding:8px 14px;white-space:nowrap">Copy all</button>
-      </div>
-      <div id="mineralCopyStatus" style="font-family:'JetBrains Mono',monospace;font-size:.68rem;color:var(--green);margin-top:6px;min-height:14px"></div>
-    </div>
-
-    <div class="card">
-      <h2>New Moms <span id="momCount" style="font-size:.75rem;color:var(--muted);font-weight:400"></span></h2>
-      <div id="momTable"></div>
-      <div class="form-row">
-        <div class="field">
-          <label>Tags (space or comma separated)</label>
-          <input id="momTag" placeholder="1234 1456 789" style="width:200px">
-        </div>
-        <div class="field"><label>Date Left Barn</label><input type="date" id="momDate"></div>
-        <button class="btn" onclick="addMom()">Add</button>
-      </div>
-    </div>
-    <div class="card">
-      <h2>Colostrum Mob <span id="colCount" style="font-size:.75rem;color:var(--muted);font-weight:400"></span></h2>
-      <p style="font-size:.75rem;color:var(--muted);margin-bottom:10px;font-style:italic">Sorted by days in mob. ⚠ Amber 3d · Red 5d+</p>
-      <div id="colTable"></div>
-      <div class="graze-calc">
-        <label>m² / cow</label>
-        <input type="number" id="colGraze" min="0" onchange="updateGraze('col')" oninput="updateGraze('col')">
-        <div class="graze-result" id="colGrazeResult">—</div>
-      </div>
-    </div>
-    <div class="card">
-      <h2>Milking Herd <span id="milkCount" style="font-size:.75rem;color:var(--muted);font-weight:400"></span></h2>
-      <div id="milkTable"></div>
-      <div id="milkMineralBlock"></div>
-      <div class="graze-calc">
-        <label>m² / cow</label>
-        <input type="number" id="milkGraze" min="0" onchange="updateGraze('milk')" oninput="updateGraze('milk')">
-        <div class="graze-result" id="milkGrazeResult">—</div>
-      </div>
-      <div class="form-row">
-        <div class="field"><label>Add tags (batch ok)</label><input id="milkTag" placeholder="1234 1456 789" style="width:200px"></div>
-        <button class="btn" onclick="addToGroup('milkingHerd','milkTag')">Add</button>
-      </div>
-    </div>
-    <div class="card">
-      <h2>Once-a-Day (OAD) <span id="oadCount" style="font-size:.75rem;color:var(--muted);font-weight:400"></span></h2>
-      <div id="oadTable"></div>
-      <div class="graze-calc">
-        <label>m² / cow</label>
-        <input type="number" id="oadGraze" min="0" onchange="updateGraze('oad')" oninput="updateGraze('oad')">
-        <div class="graze-result" id="oadGrazeResult">—</div>
-      </div>
-      <div class="form-row">
-        <div class="field"><label>Add tags (batch ok)</label><input id="oadTag" placeholder="1234 1456 789" style="width:200px"></div>
-        <button class="btn" onclick="addToGroup('oad','oadTag')">Add</button>
-      </div>
-    </div>
-    <div class="card">
-      <h2>Penicillin (Peno) <span id="penoCount" style="font-size:.75rem;color:var(--muted);font-weight:400"></span></h2>
-      <div id="penoTable"></div>
-      <div class="graze-calc">
-        <label>m² / cow</label>
-        <input type="number" id="penoGraze" min="0" onchange="updateGraze('peno')" oninput="updateGraze('peno')">
-        <div class="graze-result" id="penoGrazeResult">—</div>
-      </div>
-      <div class="form-row">
-        <div class="field"><label>Add tags (batch ok)</label><input id="penoTag" placeholder="1234 1456 789" style="width:200px"></div>
-        <button class="btn" onclick="addToGroup('peno','penoTag')">Add</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- TAB 5: EXPORT -->
-  <div id="tab5" class="hidden">
-    <div class="card">
-      <h2>Export</h2>
-      <p style="font-size:.8rem;color:var(--muted);margin-bottom:14px">Copy your current data and paste to Claude with any instructions. Claude sends back a DAIRY_IMPORT code to paste below.</p>
-      <button class="btn" onclick="doExport()">Copy Export to Clipboard</button>
-      <div id="exportBox" class="export-box hidden"></div>
-    </div>
-    <div class="card">
-      <h2>Import</h2>
-      <p style="font-size:.8rem;color:var(--muted);margin-bottom:12px">Paste the Import Code from Claude then tap Load.</p>
-      <textarea id="importBox" placeholder="Paste DAIRY_IMPORT code here…" style="width:100%;min-height:100px;background:var(--bg);border:1px solid var(--border);border-radius:3px;padding:10px;font-family:'JetBrains Mono',monospace;font-size:.72rem;color:var(--text);resize:vertical;outline:none"></textarea>
-      <div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <button class="btn" onclick="doImport()">Load Import Code</button>
-        <span id="importStatus" style="font-family:'JetBrains Mono',monospace;font-size:.72rem"></span>
-      </div>
-    </div>
-
-    <div class="card" style="border-color:var(--border);opacity:.85">
-      <h2 style="color:var(--muted)">Remove Cow from System</h2>
-      <p style="font-size:.78rem;color:var(--muted);margin-bottom:12px">Removes a cow from all active groups and records her death. Her calving history entry is retained with a died marker.</p>
-      <div class="form-row" style="border-top:none;padding-top:0;margin-top:0">
-        <div class="field"><label>Cow Tag #</label><input id="removeCowTag" placeholder="1234" style="width:90px" inputmode="numeric"></div>
-        <div class="field"><label>Date</label><input type="date" id="removeCowDate"></div>
-        <div class="field"><label>Notes (100 chars)</label><input id="removeCowNotes" placeholder="e.g. Found dead in bay 2" maxlength="100" style="width:200px"></div>
-        <button class="btn" style="background:var(--red)" onclick="removeCow()">Remove &amp; Record Death</button>
-      </div>
-      <div id="removeCowStatus" style="font-family:'JetBrains Mono',monospace;font-size:.72rem;margin-top:8px;min-height:16px"></div>
-      <div id="cowDeathList" style="margin-top:14px"></div>
-    </div>
-  </div>
-
-</div><!-- end .app -->
-</div><!-- end #appScreen -->
-
-<!-- BAY MODAL -->
-<div class="modal-overlay hidden" id="bayModal" onclick="closeBayModal(event)" style="display:none">
-  <div class="modal">
-    <h3 id="modalBayName">Bay</h3>
-    <input type="number" id="modalCount" min="0" inputmode="numeric">
-    <div class="modal-btns">
-      <button class="btn sec" onclick="closeBayModalDirect()">Cancel</button>
-      <button class="btn" onclick="saveBayModal()">Save</button>
-    </div>
-  </div>
+  <nav class="bottom">
+    <button data-screen="today" class="active" onclick="showScreen('today')">Today</button>
+    <button data-screen="births" onclick="showScreen('births')">Births</button>
+    <button data-screen="bobbies" onclick="showScreen('bobbies')">Bobbies</button>
+    <button data-screen="push" onclick="showScreen('push')">Push</button>
+    <button data-screen="treatments" onclick="showScreen('treatments')">Treatments</button>
+    <button data-screen="deaths" onclick="showScreen('deaths')">Deaths</button>
+    <button data-screen="lookup" onclick="showScreen('lookup')">Lookup</button>
+    <button data-screen="share" onclick="showScreen('share')">Share</button>
+  </nav>
 </div>
+<div class="toast" id="toast"></div>
 
 <script>
-const BAYS = ["Bay 1","Bay 2","Bay 3","Bay 4","Bay 5","Bay 6","Penicillin Paddock"];
-const FOOT_LABELS = {LF:"Left Front",RF:"Right Front",LR:"Left Rear",RR:"Right Rear"};
-const ALL_GROUPS = ['newMoms','colostrumMob','milkingHerd','oad','peno','watchList','calvedList'];
+/* ============ CONFIG ============
+   Adjust these as feeding plans get confirmed (e.g. Hereford weaning length,
+   keeper weaning decline). Everything else reads from here. */
+const CONFIG = {
+  keeper: {
+    // The real feed plan is a straight line between each of these points — any future
+    // change to the plan (instant, or ramped over N days, up or down) is just editing
+    // or adding {day, litres} points here. Two points on the same day = an instant jump.
+    // After the last point, the rate holds flat there indefinitely.
+    milestones: [
+      {day: 1,  litres: 2},
+      {day: 8,  litres: 7},
+      {day: 55, litres: 7},
+      {day: 65, litres: 4.5}
+    ],
+    // Manual wean (triggered by weight, not age — see the Wean button on Lookup).
+    // Same milestone approach, but after the last point it drops to zero rather than holding.
+    weanMilestones: [
+      {day: 0, litres: 4.5},
+      {day: 7, litres: 1}
+    ]
+  },
+  bobby:   { day0L: 2, fullL: 4, overdueDays: 5 },                   // fed until Cleared or moved to Hereford mob — no hard cutoff. overdueDays just flags the pen.
+  hereford:{ fullL: 7 },                                            // flat rate once moved into the mob (day after the move — they've already been fed that morning)
+  gramsPerLitre: 150,
+  tagPools: { D1: {min:1, max:350}, D2: {min:5001, max:5350} },
+  sheds: [1,2,3,4],
+  shedNames: { 1: 'D2 Big Shed', 2: 'D2 Long Shed', 3: 'D1 Long Shed', 4: 'D1 Big Shed' },
+  bobbyPens: [1,2,3,4,5,6,7,8],
+  bobbyFarms: { D1: 'D1', D2: 'D2', HF: 'Hereford' }
+};
+function shedName(s){ return CONFIG.shedNames[s] || ('Shed '+s); }
 
-let S = freshState();
-let G = {col:100, milk:128, oad:100, peno:100};
-let selectedFeet = [];
-let currentTab = 0;
-let _modalBay = null;
-let _saveTimer = null;
-let _unsubscribe = null;
-let _receivingSnapshot = false;  // blocks saves during incoming snapshot processing
+/* ============ FIREBASE INIT ============ */
+const firebaseConfig = {
+  apiKey: "AIzaSyATJRrzv25th-8A9KYzMqj4TpLNWvSl5tM",
+  authDomain: "calf-assistant-c7811.firebaseapp.com",
+  projectId: "calf-assistant-c7811",
+  storageBucket: "calf-assistant-c7811.firebasestorage.app",
+  messagingSenderId: "725500217327",
+  appId: "1:725500217327:web:f41f3cd03e5181d0e3581a"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL); // stay signed in until explicit sign out
+const db = firebase.firestore();
 
-function freshState() {
-  return {
-    bays: {"Bay 1":0,"Bay 2":0,"Bay 3":0,"Bay 4":0,"Bay 5":0,"Bay 6":0,"Penicillin Paddock":0},
-    treatments: [], newMoms: [], colostrumMob: [], milkingHerd: [],
-    oad: [], peno: [], lameCows: [], lameArchive: [],
-    watchList: [], calvedList: [], calvingHistory: [], usedKeeperTags: [], cowDeaths: []
-  };
-}
+/* ============ DATA (populated live from Firestore, never written to directly) ============ */
+let DATA = { calves: [], treatments: [], deaths: [], pushList: [], lastShed: 1, lastBobbyPen: 1, unit: 'L' };
+let currentRole = null; // 'admin' | 'helper'
+let unsubscribers = [];
 
-// ── Auth
-function doSignIn() {
+/* ============ AUTH ============ */
+function login(){
   const email = document.getElementById('loginEmail').value.trim();
-  const pass = document.getElementById('loginPassword').value;
-  const errEl = document.getElementById('loginErr');
-  errEl.textContent = '';
-  window._signInWithEmailAndPassword(window._auth, email, pass)
-    .catch(e => {
-      errEl.textContent = 'Sign in failed — check email and password';
-    });
+  const password = document.getElementById('loginPassword').value;
+  document.getElementById('loginError').textContent = '';
+  auth.signInWithEmailAndPassword(email, password).catch(()=>{
+    document.getElementById('loginError').textContent = 'Sign in failed — check the email and password.';
+  });
+}
+function logout(){
+  detachListeners();
+  auth.signOut();
 }
 
-function doSignOut() {
-  window._signOut(window._auth);
-}
-
-document.getElementById('loginPassword').addEventListener('keydown', e => {
-  if (e.key === 'Enter') doSignIn();
-});
-
-// ── Firestore sync
-window.startFirestoreSync = function() {
-  setSyncStatus('connecting');
-
-  // Listen to graze doc
-  window._onSnapshot(window._GRAZE_DOC, snap => {
-    if (snap.exists()) {
-      _receivingSnapshot = true;
-      G = { ...G, ...snap.data() };
-      initGraze();
-      _receivingSnapshot = false;
+auth.onAuthStateChanged(async (user)=>{
+  if(user){
+    let role = null;
+    try{
+      const roleDoc = await db.collection('users').doc(user.uid).get();
+      role = roleDoc.exists ? roleDoc.data().role : null;
+    }catch(e){
+      role = null;
     }
-  });
-
-  // Listen to main data doc
-  _unsubscribe = window._onSnapshot(window._DATA_DOC, snap => {
-    _receivingSnapshot = true;
-    if (snap.exists()) {
-      const d = snap.data();
-      ['treatments','newMoms','colostrumMob','milkingHerd','oad','peno','lameCows','lameArchive','watchList','calvedList','calvingHistory','usedKeeperTags','cowDeaths']
-        .forEach(k => { d[k] = d[k] || []; });
-      S = d;
-    }
-    setSyncStatus('live');
-    render();
-    if (currentTab === 3) setTimeout(() => { _receivingSnapshot = true; initGraze(); _receivingSnapshot = false; }, 50);
-    _receivingSnapshot = false;
-  });
-  window._unsubscribe = _unsubscribe;
-};
-
-function setSyncStatus(state) {
-  const dot = document.getElementById('syncDot');
-  const status = document.getElementById('saveStatus');
-  if (state === 'connecting') {
-    dot.className = 'sync-indicator';
-    status.textContent = 'Connecting…';
-  } else if (state === 'live') {
-    dot.className = 'sync-indicator live';
-    status.textContent = 'Live';
-  } else if (state === 'saving') {
-    dot.className = 'sync-indicator';
-    status.textContent = 'Saving…';
-  } else if (state === 'saved') {
-    dot.className = 'sync-indicator live';
-    status.textContent = 'Saved ✓';
-    setTimeout(() => { if (document.getElementById('saveStatus').textContent === 'Saved ✓') setSyncStatus('live'); }, 2000);
-  }
-}
-
-function save() {
-  if (_receivingSnapshot) return;  // never write back during an incoming snapshot
-  setSyncStatus('saving');
-  clearTimeout(_saveTimer);
-  _saveTimer = setTimeout(async () => {
-    if (_receivingSnapshot) return;
-    try {
-      await window._setDoc(window._DATA_DOC, S);
-      setSyncStatus('saved');
-    } catch(e) {
-      document.getElementById('saveStatus').textContent = '⚠ Save failed';
-    }
-  }, 600);
-}
-
-function saveGraze() {
-  if (_receivingSnapshot) return;  // never write back during an incoming snapshot
-  window._setDoc(window._GRAZE_DOC, G).catch(()=>{});
-}
-
-// ── Helpers
-const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2);
-const todayStr = () => {
-  // Use NZ local date, not UTC
-  const nz = new Date().toLocaleDateString('en-CA', {timeZone: 'Pacific/Auckland'});
-  return nz; // returns YYYY-MM-DD
-};
-const fmtDayHeader = (dateStr) => {
-  const [y,m,d] = dateStr.split('-');
-  const dt = new Date(dateStr+'T12:00:00');
-  const dayName = dt.toLocaleDateString('en-NZ', {weekday:'short', timeZone:'Pacific/Auckland'});
-  return `${dayName} ${parseInt(d)} ${dt.toLocaleDateString('en-NZ',{month:'short',timeZone:'Pacific/Auckland'})}`;
-};
-const fmtDate = d => { if(!d) return "—"; const [y,m,day]=d.split("-"); return `${day}/${m}/${y}`; };
-const daysSince = d => {
-  // Compare NZ date strings directly — no Date object conversion to avoid UTC offset issues
-  const todayNZ = new Date().toLocaleDateString('en-CA', {timeZone:'Pacific/Auckland'}); // YYYY-MM-DD
-  if (!d || d === todayNZ) return 0;
-  // Parse year/month/day directly from strings
-  const [ty,tm,td] = todayNZ.split('-').map(Number);
-  const [fy,fm,fd] = d.split('-').map(Number);
-  // Use UTC construction so no timezone shift occurs
-  const msToday = Date.UTC(ty, tm-1, td);
-  const msFrom = Date.UTC(fy, fm-1, fd);
-  return Math.max(0, Math.floor((msToday - msFrom) / 86400000));
-};
-const bayTotal = () => Object.values(S.bays).reduce((a,b)=>a+b,0);
-
-function clearanceBadge(dateStr) {
-  const todayNZ = new Date().toLocaleDateString('en-CA', {timeZone:'Pacific/Auckland'});
-  const diff = Math.floor((new Date(dateStr + 'T00:00:00') - new Date(todayNZ + 'T00:00:00')) / 86400000);
-  if (diff < 0) return `<span class="badge green">Cleared</span>`;
-  if (diff === 0) return `<span class="badge amber">Today</span>`;
-  if (diff <= 7) return `<span class="badge amber">${diff}d</span>`;
-  return `<span class="badge red">${diff}d</span>`;
-}
-
-function colAlert(dateStr) {
-  const d = daysSince(dateStr);
-  if (d >= 5) return `<span class="badge red">⚠ ${d}d</span>`;
-  if (d >= 3) return `<span class="badge amber">${d}d</span>`;
-  return `<span class="badge green">${d}d</span>`;
-}
-
-// ── Tabs
-function showTab(n) {
-  document.querySelectorAll(".tab").forEach((t,i) => t.classList.toggle("active", i===n));
-  for(let i=0;i<6;i++) document.getElementById("tab"+i).classList.toggle("hidden", i!==n);
-  currentTab = n;
-  render();
-  if (n === 4) setTimeout(initGraze, 50);
-  if (n === 3) renderCalvingWatch();
-}
-
-// ── Render
-function render() {
-  renderBays();
-  renderTreatments();
-  renderLame();
-  renderCalvingWatch();
-  renderCalving();
-  renderCowDeathList();
-}
-
-function renderBays() {
-  const grid = document.getElementById("bayGrid");
-  if (!grid) return;
-  let html = BAYS.map(b => `
-    <div class="bay-cell" onclick="openBayModal('${b}')">
-      <div class="bay-name">${b}</div>
-      <div class="bay-count">${S.bays[b]||0}</div>
-    </div>`).join("");
-  html += `<div class="bay-cell total"><div class="bay-name">All Bays</div><div class="bay-count">${bayTotal()}</div></div>`;
-  grid.innerHTML = html;
-  ["txLoc","lameLoc"].forEach(id => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    const cur = el.value;
-    el.innerHTML = BAYS.map(b=>`<option${b===cur?" selected":""}>${b}</option>`).join("");
-  });
-}
-
-function renderTreatments() {
-  const el = document.getElementById("txTable");
-  if (!el) return;
-  if (!S.treatments.length) { el.innerHTML = `<p class="empty">No animals under treatment</p>`; return; }
-  el.innerHTML = `<table>
-    <thead><tr><th>Tag</th><th>Location</th><th>Treatment</th><th>Withhold</th><th>Status</th><th></th></tr></thead>
-    <tbody>${S.treatments.map(t=>`
-      <tr>
-        <td><span class="tag">${t.tag}</span></td>
-        <td>${t.location}</td>
-        <td>${t.treatment}</td>
-        <td style="font-family:monospace">${fmtDate(t.meatWithholdDate)}</td>
-        <td>${clearanceBadge(t.meatWithholdDate)}</td>
-        <td><button class="del" onclick="delTx('${t.id}')">✕</button></td>
-      </tr>`).join("")}
-    </tbody></table>`;
-}
-
-function renderLame() {
-  const el = document.getElementById("lameTable");
-  if (!el) return;
-  if (!S.lameCows.length) { el.innerHTML = `<p class="empty">No lame cows recorded</p>`; }
-  else el.innerHTML = `<table>
-    <thead><tr><th>Tag</th><th>Location</th><th>Feet</th><th>Notes</th><th></th><th></th></tr></thead>
-    <tbody>${S.lameCows.map(c=>`
-      <tr>
-        <td><span class="tag">${c.tag}</span></td>
-        <td>${c.location}</td>
-        <td style="font-family:'JetBrains Mono',monospace;font-size:.72rem">${c.feet.map(f=>FOOT_LABELS[f]).join(", ")}</td>
-        <td style="color:var(--muted);font-size:.75rem">${c.notes||"—"}</td>
-        <td><button class="treat-btn" id="tb-${c.id}" onclick="treatTap('${c.id}')">Treated?</button></td>
-        <td><button class="del" onclick="delLame('${c.id}')">✕</button></td>
-      </tr>`).join("")}
-    </tbody></table>`;
-
-  const archCard = document.getElementById("lameArchiveCard");
-  const archEl = document.getElementById("lameArchiveTable");
-  if (!archEl) return;
-  if (!S.lameArchive.length) { archCard.classList.add("hidden"); }
-  else {
-    archCard.classList.remove("hidden");
-    archEl.innerHTML = `<table>
-      <thead><tr><th>Tag</th><th>Location</th><th>Feet</th><th>Cleared</th><th></th></tr></thead>
-      <tbody>${S.lameArchive.map(c=>`
-        <tr class="archived-row">
-          <td><span class="tag">${c.tag}</span></td>
-          <td>${c.location}</td>
-          <td style="font-family:'JetBrains Mono',monospace;font-size:.72rem">${c.feet.map(f=>FOOT_LABELS[f]).join(", ")}</td>
-          <td style="font-size:.72rem">${fmtDate(c.clearedDate)}</td>
-          <td><button class="del" onclick="delLameArchive('${c.id}')">✕</button></td>
-        </tr>`).join("")}
-      </tbody></table>`;
-  }
-}
-
-// ── Watch list
-let _watchStatus = null;
-function pickWatchStatus(s) {
-  _watchStatus = s;
-  ['Calving','Close','Other'].forEach(x => {
-    const btn = document.getElementById('ws-'+x);
-    if (btn) btn.classList.toggle('selected', x === s);
-  });
-}
-
-let _watchBay = null;
-function addToWatchBay(bay) {
-  _watchBay = bay;
-  ['1','2','3','4','5','6','P'].forEach(b => {
-    const btn = document.getElementById('wb-'+b);
-    if (btn) btn.classList.toggle('selected', bay === ('Bay '+b) || (b==='P' && bay==='Penicillin Paddock'));
-  });
-  setTimeout(() => { const i = document.getElementById('watchTag'); if(i) i.focus(); }, 30);
-}
-
-function submitWatch() {
-  const raw = document.getElementById('watchTag').value.trim();
-  if (!raw) { document.getElementById('watchTag').style.borderColor='var(--red)'; setTimeout(()=>document.getElementById('watchTag').style.borderColor='',1200); return; }
-  if (!_watchStatus) { ['Calving','Close','Other'].forEach(x => { const b=document.getElementById('ws-'+x); if(b) b.style.borderColor='var(--red)'; }); setTimeout(()=>['Calving','Close','Other'].forEach(x=>{const b=document.getElementById('ws-'+x);if(b)b.style.borderColor='';}),1200); return; }
-  if (!_watchBay) { return; }
-  const tag = raw.trim();
-  if (tag) {
-    // calvedList takes priority — can't add to watch if already calved
-    if (S.calvedList.find(c => c.tag === tag)) {
-      setTimeout(() => { const i = document.getElementById('watchTag'); if(i) i.focus(); }, 80);
+    if(role !== 'admin' && role !== 'helper'){
+      document.getElementById('loginError').textContent = 'Your account isn\'t set up yet — check with James.';
+      auth.signOut();
       return;
     }
-    S.watchList = S.watchList.filter(w => w.tag !== tag);
-    S.watchList.push({ id: uid(), tag, status: _watchStatus, location: _watchBay, dateAdded: todayStr() });
-  }
-  document.getElementById('watchTag').value = '';
-  save(); renderCalvingWatch();
-  setTimeout(() => { const i = document.getElementById('watchTag'); if(i) i.focus(); }, 80);
-}
-
-function addToWatch() {
-  // kept for compatibility — bay buttons now do the submitting
-}
-
-function moveToCalved(id) {
-  const cow = S.watchList.find(w => w.id === id); if (!cow) return;
-  S.watchList = S.watchList.filter(w => w.id !== id);
-  S.calvedList.push({ id: uid(), tag: cow.tag, dateCalved: todayStr(), bay: cow.location || null, sex: null, calfType: null, keeperTag: null, movedToFresh: false });
-  save(); renderCalvingWatch();
-}
-
-let _directBay = null;
-function pickDirectBay(bay) {
-  _directBay = bay;
-  ['1','2','3','4','5','6','P'].forEach(b => {
-    const btn = document.getElementById('db-'+b);
-    if (btn) btn.classList.toggle('selected', bay === ('Bay '+b) || (b==='P' && bay==='Penicillin Paddock'));
-  });
-  setTimeout(() => { const i = document.getElementById('directCalvedTag'); if(i) i.focus(); }, 30);
-}
-
-function addDirectCalved() {
-  const raw = document.getElementById('directCalvedTag').value.trim();
-  const date = document.getElementById('directCalvedDate').value || todayStr();
-  if (!raw) return;
-  S.watchList = S.watchList.filter(w => w.tag !== raw);
-  S.calvedList.push({ id: uid(), tag: raw, dateCalved: date, bay: _directBay, sex: null, calfType: null, keeperTag: null, movedToFresh: false });
-  document.getElementById('directCalvedTag').value = '';
-  save(); renderCalvingWatch();
-  // Keep bay selected, refocus for next entry
-  setTimeout(() => { const i = document.getElementById('directCalvedTag'); if(i) i.focus(); }, 80);
-}
-
-function removeFromWatch(id) {
-  S.watchList = S.watchList.filter(w => w.id !== id);
-  save(); renderCalvingWatch();
-}
-
-function setCalvedSex(id, sex, twin) {
-  const c = S.calvedList.find(x => x.id === id); if (!c) return;
-  if (twin) { c.twinSex = sex; c.twinType = null; c.twinKeeperTag = null; }
-  else { c.sex = sex; c.calfType = null; c.keeperTag = null; }
-  save(); renderCalvingWatch();
-}
-
-function setCalvedType(id, type, twin) {
-  const c = S.calvedList.find(x => x.id === id); if (!c) return;
-  if (twin) { c.twinType = type; c.twinKeeperTag = null; }
-  else { c.calfType = type; c.keeperTag = null; }
-  save(); renderCalvingWatch();
-}
-
-function setKeeperTag(id, tag, twin) {
-  const c = S.calvedList.find(x => x.id === id); if (!c) return;
-  if (twin) {
-    if (c.twinKeeperTag) S.usedKeeperTags = S.usedKeeperTags.filter(t => t !== c.twinKeeperTag);
-    c.twinKeeperTag = tag;
-    if (!S.usedKeeperTags.includes(tag)) S.usedKeeperTags.push(tag);
+    currentRole = role;
+    document.getElementById('loginScreen').style.display = 'none';
+    document.querySelector('.app').style.display = '';
+    setupForRole();
+    attachListeners();
   } else {
-    if (c.keeperTag) S.usedKeeperTags = S.usedKeeperTags.filter(t => t !== c.keeperTag);
-    c.keeperTag = tag;
-    if (!S.usedKeeperTags.includes(tag)) S.usedKeeperTags.push(tag);
+    currentRole = null;
+    document.getElementById('loginScreen').style.display = '';
+    document.querySelector('.app').style.display = 'none';
   }
-  save(); renderCalvingWatch();
-}
-
-function toggleTwins(id) {
-  const c = S.calvedList.find(x => x.id === id); if (!c) return;
-  c.twins = !c.twins;
-  if (!c.twins) { c.twinSex = null; c.twinType = null; c.twinKeeperTag = null; c.twinDead = false; }
-  save(); renderCalvingWatch();
-}
-
-function toggleDead(id, twin) {
-  const c = S.calvedList.find(x => x.id === id); if (!c) return;
-  if (twin) c.twinDead = !c.twinDead;
-  else c.calfDead = !c.calfDead;
-  save(); renderCalvingWatch();
-}
-
-function moveCalvedToFresh(id) {
-  const c = S.calvedList.find(x => x.id === id); if (!c) return;
-  removeDuplicates(c.tag, 'newMoms');
-  S.newMoms.push({ id: uid(), tag: c.tag, dateLeftBarn: todayStr() });
-  c.movedToFresh = true;
-  // Deduct from bay count if bay is recorded
-  if (c.bay && S.bays[c.bay] !== undefined) {
-    S.bays[c.bay] = Math.max(0, (S.bays[c.bay] || 0) - 1);
-  }
-  // Archive to history then remove from active list
-  if (!S.calvingHistory) S.calvingHistory = [];
-  const idx = S.calvingHistory.findIndex(h => h.id === c.id);
-  if (idx !== -1) S.calvingHistory[idx] = { ...c };
-  else S.calvingHistory.push({ ...c });
-  S.calvedList = S.calvedList.filter(x => x.id !== id);
-  save(); renderCalvingWatch(); render();
-}
-
-let _clearCalvedConfirming = false;
-function clearCalvedList() {
-  if (!_clearCalvedConfirming) {
-    _clearCalvedConfirming = true;
-    renderCalvingWatch();
-    return;
-  }
-  _clearCalvedConfirming = false;
-  if (!S.calvingHistory) S.calvingHistory = [];
-  S.calvedList.forEach(c => {
-    const idx = S.calvingHistory.findIndex(h => h.id === c.id);
-    if (idx !== -1) S.calvingHistory[idx] = { ...c };
-    else S.calvingHistory.push({ ...c });
-  });
-  S.calvedList = [];
-  save(); renderCalvingWatch();
-}
-function cancelClearCalved() {
-  _clearCalvedConfirming = false;
-  renderCalvingWatch();
-}
-
-function removeFromCalved(id) {
-  const c = S.calvedList.find(x => x.id === id);
-  if (c) {
-    if (c.keeperTag) S.usedKeeperTags = S.usedKeeperTags.filter(t => t !== c.keeperTag);
-    if (c.twinKeeperTag) S.usedKeeperTags = S.usedKeeperTags.filter(t => t !== c.twinKeeperTag);
-  }
-  S.calvedList = S.calvedList.filter(x => x.id !== id);
-  save(); renderCalvingWatch();
-}
-
-const WATCH_COLOURS = { Calving: 'red', Close: 'amber', Other: 'green' };
-
-function renderCalvingWatch() {
-  // Watch list
-  const watchC = document.getElementById('watchCount');
-  const watchEl = document.getElementById('watchTable');
-  if (watchC) watchC.textContent = S.watchList.length ? `— ${S.watchList.length} cows` : '';
-  if (watchEl) {
-    if (!S.watchList.length) { watchEl.innerHTML = `<p class="empty">No cows on watch</p>`; }
-    else {
-      // Group by location, sort bays 1-6 then P
-      const bayOrder = ['Bay 1','Bay 2','Bay 3','Bay 4','Bay 5','Bay 6','Penicillin Paddock'];
-      const groups = {};
-      S.watchList.forEach(w => {
-        const loc = w.location || 'Unknown';
-        if (!groups[loc]) groups[loc] = [];
-        groups[loc].push(w);
-      });
-      // Sort cows within each group by tag numerically
-      Object.values(groups).forEach(g => g.sort((a,b) => a.tag.localeCompare(b.tag, undefined, {numeric:true})));
-      const orderedKeys = [...bayOrder.filter(b => groups[b]), ...Object.keys(groups).filter(k => !bayOrder.includes(k))];
-      
-      const watchTotal = S.watchList.length;
-      watchEl.innerHTML = orderedKeys.map(loc => `
-        <div style="margin-bottom:12px">
-          <div style="font-family:'JetBrains Mono',monospace;font-size:.68rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);padding:4px 0;border-bottom:1px solid var(--border);margin-bottom:6px;display:flex;justify-content:space-between"><span>${loc}</span><span>${groups[loc].length}</span></div>
-          <table>
-            <thead><tr><th>Tag</th><th>Status</th><th></th><th></th></tr></thead>
-            <tbody>${groups[loc].map(w => `
-              <tr>
-                <td><span class="tag">${w.tag}</span></td>
-                <td><span class="badge ${WATCH_COLOURS[w.status]}">${w.status}</span></td>
-                <td><button class="btn sec" style="font-size:.68rem;padding:3px 8px" onclick="moveToCalved('${w.id}')">→ Calved</button></td>
-                <td><button class="del" onclick="removeFromWatch('${w.id}')">✕</button></td>
-              </tr>`).join('')}
-            </tbody>
-          </table>
-        </div>`).join('') +
-        `<div style="font-family:'JetBrains Mono',monospace;font-size:.72rem;font-weight:600;color:var(--accent);border-top:2px solid var(--border);padding-top:8px;margin-top:4px;display:flex;justify-content:space-between"><span>Total on watch</span><span>${watchTotal}</span></div>`;
-    }
-  }
-
-  // Calved list
-  const calvedC = document.getElementById('calvedCount');
-  const calvedEl = document.getElementById('calvedTable');
-  const calvedClearBtn = document.getElementById('calvedClearBtn');
-  if (calvedC) calvedC.textContent = S.calvedList.length ? `— ${S.calvedList.length} cows` : '';
-
-  if (calvedEl) {
-    // Only show today's unfinished entries in the active calved section
-    // Show all cows in the active calved list
-    const pendingCows = S.calvedList;
-    
-    if (!pendingCows.length) { calvedEl.innerHTML = `<p class="empty">No calved cows to process</p>`; }
-    else {
-      const availTags = [];
-      for (let t = 1; t <= 350; t++) { if (!S.usedKeeperTags.includes(t)) availTags.push(t); }
-
-      // Helper to build one calf's selector block
-      function calfBlock(c, availTags, twin) {
-        const sex = twin ? c.twinSex : c.sex;
-        const calfType = twin ? c.twinType : c.calfType;
-        const keeperTag = twin ? c.twinKeeperTag : c.keeperTag;
-        const dead = twin ? c.twinDead : c.calfDead;
-        const tParam = twin ? ',true' : ',false';
-
-        // All calf detail buttons in one horizontal row
-        const typeOptions = sex === 'H'
-          ? ['Keeper','Hereford','Bobby']
-          : sex === 'B' ? ['Bobby','Hereford'] : [];
-        const typePart = typeOptions.map(t =>
-          `<button class="foot-btn${calfType===t?' selected':''}" style="font-size:.66rem;padding:4px 7px" onclick="setCalvedType('${c.id}','${t}'${tParam})">${t}</button>`
-        ).join('');
-        const sexBtns = `<div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center">
-          <button class="foot-btn${sex==='H'?' selected':''}" style="font-size:.66rem;padding:4px 7px" onclick="setCalvedSex('${c.id}','H'${tParam})">H</button>
-          <button class="foot-btn${sex==='B'?' selected':''}" style="font-size:.66rem;padding:4px 7px" onclick="setCalvedSex('${c.id}','B'${tParam})">B</button>
-          ${typePart}
-          <button class="foot-btn${dead?' selected':''}" style="font-size:.66rem;padding:4px 7px;${dead?'background:var(--red);border-color:var(--red);color:#fff;':''}" onclick="toggleDead('${c.id}'${tParam})">☠</button>
-        </div>`;
-
-        let typeBtns = ''; // now inline above, kept for structure
-
-        let keeperPicker = '';
-        if (calfType === 'Keeper') {
-          const tagsForPicker = availTags.concat(keeperTag ? [keeperTag] : []).sort((a,b)=>a-b);
-          keeperPicker = `<details style="margin-top:8px">
-            <summary style="font-family:'JetBrains Mono',monospace;font-size:.7rem;color:var(--muted);cursor:pointer">
-              ${keeperTag ? '🏷 Tag #'+keeperTag+' assigned' : 'Assign keeper tag ▾'}
-            </summary>
-            <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:8px;max-height:150px;overflow-y:auto">
-              ${tagsForPicker.map(t => `<button class="foot-btn${keeperTag===t?' selected':''}" style="padding:4px 8px;font-size:.7rem" onclick="setKeeperTag('${c.id}',${t}${tParam})">${t}</button>`).join('')}
-            </div>
-          </details>`;
-        }
-
-        return sexBtns + typeBtns + keeperPicker;
-      }
-
-      // Bay counts for calved list
-      const calvedBayGroups = {};
-      pendingCows.forEach(c => {
-        const b = c.bay || 'Unknown';
-        calvedBayGroups[b] = (calvedBayGroups[b] || 0) + 1;
-      });
-      const bayOrder2 = ['Bay 1','Bay 2','Bay 3','Bay 4','Bay 5','Bay 6','Penicillin Paddock','Unknown'];
-      const calvedBaySummary = bayOrder2.filter(b=>calvedBayGroups[b]).map(b=>
-        `<span style="font-family:'JetBrains Mono',monospace;font-size:.68rem;color:var(--muted)">${b==='Penicillin Paddock'?'P':b.replace('Bay ','')} <strong style="color:var(--accent)">${calvedBayGroups[b]}</strong></span>`
-      ).join('<span style="color:var(--border);margin:0 4px">·</span>');
-      const calvedTotal = pendingCows.length;
-
-      calvedEl.innerHTML = pendingCows.map(c => {
-        const bayLabel = c.bay ? `<span style="font-family:'JetBrains Mono',monospace;font-size:.7rem;background:var(--bg);border:1px solid var(--border);border-radius:2px;padding:1px 5px;margin-left:4px">${c.bay==='Penicillin Paddock'?'P':c.bay.replace('Bay ','')}</span>` : '';
-
-        const calf1 = calfBlock(c, availTags, false);
-        const twinsSection = c.twins
-          ? `<div style="border-top:1px dashed var(--border);margin-top:10px;padding-top:10px">
-               <div style="font-family:'JetBrains Mono',monospace;font-size:.66rem;color:var(--muted);margin-bottom:6px">TWIN CALF</div>
-               ${calfBlock(c, availTags, true)}
-             </div>`
-          : '';
-
-        const twinToggle = c.sex
-          ? `<button class="foot-btn${c.twins?' selected':''}" style="margin-top:6px;font-size:.68rem" onclick="toggleTwins('${c.id}')">👯 Twins</button>`
-          : '';
-
-        // Fresh cows button — dead calf overrides keeper tag requirement
-        const calf1Ready = c.sex && c.calfType && (c.calfDead || c.calfType !== 'Keeper' || c.keeperTag);
-        const twinReady = !c.twins || (c.twinSex && c.twinType && (c.twinDead || c.twinType !== 'Keeper' || c.twinKeeperTag));
-        const freshBtn = (calf1Ready && twinReady)
-          ? `<button class="btn${c.movedToFresh?' sec':''}" style="font-size:.68rem;padding:4px 10px;margin-top:10px" onclick="moveCalvedToFresh('${c.id}')">${c.movedToFresh ? '✓ In Fresh Cows' : '→ Fresh Cows'}</button>`
-          : '';
-
-        return `<div style="border:1px solid var(--border);border-radius:4px;padding:10px 12px;margin-bottom:8px">
-          <div style="display:flex;justify-content:space-between;align-items:center">
-            <div><span class="tag">${c.tag}</span>${bayLabel}</div>
-            <div style="display:flex;align-items:center;gap:8px">
-              <span style="font-size:.68rem;color:var(--muted);font-family:'JetBrains Mono',monospace">${fmtDate(c.dateCalved)}</span>
-              <button class="del" onclick="removeFromCalved('${c.id}')">✕</button>
-            </div>
-          </div>
-          <div style="margin-top:6px">${calf1}</div>
-          ${twinToggle}
-          ${twinsSection}
-          ${freshBtn}
-        </div>`;
-      }).join('') + (pendingCows.length ? `
-        <div style="font-family:'JetBrains Mono',monospace;font-size:.72rem;border-top:2px solid var(--border);padding-top:10px;margin-top:6px">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-            <strong style="color:var(--accent)">Total: ${calvedTotal}</strong>
-          </div>
-          <div style="display:flex;flex-wrap:wrap;gap:8px">${calvedBaySummary}</div>
-        </div>` : '');
-    }
-  }
-
-  if (calvedClearBtn) {
-    if (!S.calvedList.length) {
-      calvedClearBtn.innerHTML = '';
-    } else if (_clearCalvedConfirming) {
-      calvedClearBtn.innerHTML = `
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          <span style="font-family:'JetBrains Mono',monospace;font-size:.72rem;color:var(--muted)">Archive all to history and clear?</span>
-          <button class="btn" style="background:var(--red);padding:6px 12px;font-size:.78rem" onclick="clearCalvedList()">Yes, clear</button>
-          <button class="btn sec" style="padding:6px 12px;font-size:.78rem" onclick="cancelClearCalved()">Cancel</button>
-        </div>`;
-    } else {
-      calvedClearBtn.innerHTML = `<button class="btn sec" onclick="clearCalvedList()">Clear calved list</button>`;
-    }
-  }
-
-  // Set direct entry date default
-  const dcd = document.getElementById('directCalvedDate');
-  if (dcd && !dcd.value) dcd.value = todayStr();
-
-  // History
-  renderCalvingHistory();
-}
-
-function renderCalvingHistory() {
-  const el = document.getElementById('calvingHistory');
-  if (!el) return;
-  // Merge calvedList and calvingHistory, deduplicate by id, history takes precedence
-  const allRecords = [...(S.calvingHistory||[])];
-  S.calvedList.forEach(c => { if (!allRecords.find(h=>h.id===c.id)) allRecords.push(c); });
-  if (!allRecords.length) { el.innerHTML = `<p class="empty">No calving records yet</p>`; return; }
-
-  // Group by date
-  const groups = {};
-  allRecords.forEach(c => {
-    if (!groups[c.dateCalved]) groups[c.dateCalved] = [];
-    groups[c.dateCalved].push(c);
-  });
-
-  // Sort dates descending
-  const dates = Object.keys(groups).sort((a,b) => b.localeCompare(a));
-
-  el.innerHTML = dates.map(date => {
-    const cows = groups[date];
-    // Count all calves including twins
-    let keepers=0, bobbies=0, herefords=0, unknown=0, deadCalves=0;
-    cows.forEach(c => {
-      if (c.calfType==='Keeper') keepers++; else if (c.calfType==='Bobby') bobbies++;
-      else if (c.calfType==='Hereford') herefords++; else unknown++;
-      if (c.calfDead) deadCalves++;
-      if (c.twins) {
-        if (c.twinType==='Keeper') keepers++; else if (c.twinType==='Bobby') bobbies++;
-        else if (c.twinType==='Hereford') herefords++; else unknown++;
-        if (c.twinDead) deadCalves++;
-      }
-    });
-    const twins = cows.filter(c=>c.twins).length;
-    let summaryParts = [];
-    if (keepers) summaryParts.push(`${keepers}K`);
-    if (bobbies) summaryParts.push(`${bobbies}B`);
-    if (herefords) summaryParts.push(`${herefords}HF`);
-    if (unknown) summaryParts.push(`${unknown}?`);
-    if (twins) summaryParts.push(`${twins} twins`);
-    if (deadCalves) summaryParts.push(`${deadCalves} ☠`);
-    const summary = summaryParts.join(' · ');
-
-    const rows = cows.map(c => {
-      const bayLabel = c.bay ? (c.bay === 'Penicillin Paddock' ? 'P' : c.bay.replace('Bay ','')) : '?';
-      const typeLabel = c.calfType || '?';
-      const sexLabel = c.sex || '?';
-      const keeperTagLabel = c.keeperTag ? ` #${c.keeperTag}` : '';
-      const deadMark = c.calfDead ? ' ☠' : '';
-      const cowDeadMark = (S.cowDeaths||[]).find(d=>d.tag===c.tag) ? ' <span style="color:var(--red);font-size:.65rem">COW DIED</span>' : '';
-      let calfInfo = `${sexLabel} · ${typeLabel}${keeperTagLabel}${deadMark}`;
-      if (c.twins) {
-        const t2 = `${c.twinSex||'?'} · ${c.twinType||'?'}${c.twinKeeperTag?' #'+c.twinKeeperTag:''}${c.twinDead?' ☠':''}`;
-        calfInfo += ` + ${t2} <span style="font-size:.62rem;color:var(--muted)">(twins)</span>`;
-      }
-      return `<tr>
-        <td><span class="tag" style="font-size:.8rem">${c.tag}</span>${cowDeadMark}</td>
-        <td style="font-family:'JetBrains Mono',monospace;font-size:.7rem">Bay ${bayLabel}</td>
-        <td style="font-family:'JetBrains Mono',monospace;font-size:.7rem">${calfInfo}</td>
-      </tr>`;
-    }).join('');
-
-    return `<details style="border:1px solid var(--border);border-radius:3px;margin-bottom:6px">
-      <summary style="padding:10px 12px;cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center">
-        <span style="font-family:'JetBrains Mono',monospace;font-size:.75rem;font-weight:600">${fmtDayHeader(date)}</span>
-        <span style="font-family:'JetBrains Mono',monospace;font-size:.7rem;color:var(--muted)">${cows.length} cows · ${summary}</span>
-      </summary>
-      <div style="padding:0 12px 12px">
-        <table style="margin-top:8px">
-          <thead><tr><th>Tag</th><th>Bay</th><th>Calf</th></tr></thead>
-          <tbody>${rows}</tbody>
-        </table>
-      </div>
-    </details>`;
-  }).join('');
-}
-
-// ── Copy minerals to clipboard
-function copyMinerals() {
-  const momCount = S.newMoms.length;
-  const colCount = S.colostrumMob.length;
-  const milkCount = S.milkingHerd.length;
-
-  const lines = ['Mineral requirements — ' + new Date().toLocaleDateString('en-NZ', {timeZone:'Pacific/Auckland', day:'numeric', month:'short'}), ''];
-
-  if (momCount > 0) {
-    lines.push('New Moms (' + momCount + ' cows) — on bale');
-    lines.push('MgO: ' + fmtMineral(momCount * 100));
-    lines.push('Lime: ' + fmtMineral(momCount * 200));
-    lines.push('');
-  }
-
-  if (colCount > 0) {
-    lines.push('Colostrum (' + colCount + ' cows)');
-    lines.push('Morning bale — MgO: ' + fmtMineral(colCount * 100) + ' · Lime: ' + fmtMineral(colCount * 200));
-    lines.push('Afternoon break — Lime: ' + fmtMineral(colCount * 200));
-    lines.push('');
-  }
-
-  if (milkCount > 0) {
-    lines.push('Milking herd (' + milkCount + ' cows) — fresh break');
-    lines.push('Lime: ' + fmtMineral(milkCount * 100));
-    lines.push('');
-  }
-
-  if (momCount === 0 && colCount === 0 && milkCount === 0) {
-    lines.push('No cows recorded yet.');
-  }
-
-  const text = lines.join('\n').trim();
-  navigator.clipboard?.writeText(text).then(() => {
-    const el = document.getElementById('mineralCopyStatus');
-    if (el) { el.textContent = '✓ Copied to clipboard'; setTimeout(() => el.textContent = '', 2000); }
-  }).catch(() => {
-    const el = document.getElementById('mineralCopyStatus');
-    if (el) { el.textContent = '✕ Copy failed — try again'; setTimeout(() => el.textContent = '', 2000); }
-  });
-}
-
-// ── Mineral calculations
-function fmtMineral(grams) {
-  if (grams === 0) return '0g';
-  if (grams < 1000) return grams + 'g';
-  return (grams / 1000).toFixed(grams % 1000 === 0 ? 0 : 1) + 'kg';
-}
-
-function mineralBlock(group, count) {
-  if (count === 0) return '';
-  let rows = '';
-  if (group === 'newMoms') {
-    const mgo = count * 100;
-    const lime = count * 200;
-    rows = `
-      <div class="mineral-title">Minerals — on bale (per day)</div>
-      <div class="mineral-row"><span class="mineral-label">MgO</span><span class="mineral-value">${fmtMineral(mgo)}</span></div>
-      <div class="mineral-row"><span class="mineral-label">Lime</span><span class="mineral-value">${fmtMineral(lime)}</span></div>`;
-  } else if (group === 'colostrum') {
-    const mgo_am = count * 100;
-    const lime_am = count * 200;
-    const lime_pm = count * 200;
-    rows = `
-      <div class="mineral-title">Minerals — morning bale</div>
-      <div class="mineral-row"><span class="mineral-label">MgO</span><span class="mineral-value">${fmtMineral(mgo_am)}</span></div>
-      <div class="mineral-row"><span class="mineral-label">Lime</span><span class="mineral-value">${fmtMineral(lime_am)}</span></div>
-      <hr class="mineral-divider">
-      <div class="mineral-title">Minerals — afternoon break</div>
-      <div class="mineral-row"><span class="mineral-label">Lime</span><span class="mineral-value">${fmtMineral(lime_pm)}</span></div>`;
-  } else if (group === 'milking') {
-    const lime = count * 100;
-    rows = `
-      <div class="mineral-title">Minerals — fresh break (once daily)</div>
-      <div class="mineral-row"><span class="mineral-label">Lime</span><span class="mineral-value">${fmtMineral(lime)}</span></div>`;
-  }
-  return `<div class="mineral-calc">${rows}</div>`;
-}
-
-function renderCalving() {
-  // New Moms
-  const momC = document.getElementById("momCount");
-  const momEl = document.getElementById("momTable");
-  if (momC) momC.textContent = S.newMoms.length ? `— ${S.newMoms.length} cows` : "";
-  if (momEl) {
-    if (!S.newMoms.length) { momEl.innerHTML = `<p class="empty">No new moms yet</p>`; }
-    else momEl.innerHTML = `<table>
-      <thead><tr><th>Tag</th><th>Left Barn</th><th>Days</th><th></th><th></th></tr></thead>
-      <tbody>${S.newMoms.map(m=>`
-        <tr>
-          <td><span class="tag">${m.tag}</span></td>
-          <td>${fmtDate(m.dateLeftBarn)}</td>
-          <td>${daysSince(m.dateLeftBarn)}d</td>
-          <td><button class="btn sec" style="font-size:.7rem;padding:4px 8px" onclick="momToCol('${m.id}')">→ Colostrum</button></td>
-          <td><button class="del" onclick="delMom('${m.id}')">✕</button></td>
-        </tr>`).join("")}
-      </tbody></table>` + mineralBlock('newMoms', S.newMoms.length);
-  }
-
-  // Colostrum
-  const colC = document.getElementById("colCount");
-  const colEl = document.getElementById("colTable");
-  if (colC) colC.textContent = S.colostrumMob.length ? `— ${S.colostrumMob.length} cows` : "";
-  if (colEl) {
-    const sorted = [...S.colostrumMob].sort((a,b) => {
-      const dd = daysSince(b.dateEntered) - daysSince(a.dateEntered);
-      return dd !== 0 ? dd : a.tag.localeCompare(b.tag, undefined, {numeric:true});
-    });
-    if (!sorted.length) { colEl.innerHTML = `<p class="empty">Colostrum mob is empty</p>`; }
-    else colEl.innerHTML = `<table>
-      <thead><tr><th>Tag</th><th>Entered</th><th>Days</th><th colspan="3">Move to</th><th></th></tr></thead>
-      <tbody>${sorted.map(c=>`
-        <tr>
-          <td><span class="tag">${c.tag}</span></td>
-          <td>${fmtDate(c.dateEntered)}</td>
-          <td>${colAlert(c.dateEntered)}</td>
-          <td><button class="btn sec" style="font-size:.66rem;padding:3px 6px" onclick="colExit('${c.id}','milkingHerd')">Herd</button></td>
-          <td><button class="btn sec" style="font-size:.66rem;padding:3px 6px" onclick="colExit('${c.id}','oad')">OAD</button></td>
-          <td><button class="btn sec" style="font-size:.66rem;padding:3px 6px" onclick="colExit('${c.id}','peno')">Peno</button></td>
-          <td><button class="del" onclick="delCol('${c.id}')">✕</button></td>
-        </tr>`).join("")}
-      </tbody></table>` + mineralBlock('colostrum', sorted.length);
-  }
-
-  // Milking mineral block
-  const milkMineralEl = document.getElementById('milkMineralBlock');
-  if (milkMineralEl) milkMineralEl.innerHTML = mineralBlock('milking', S.milkingHerd.length);
-  renderGroup('milkingHerd','milkTable','milkCount');
-  renderGroup('oad','oadTable','oadCount');
-  renderGroup('peno','penoTable','penoCount');
-  // Refresh graze calcs whenever cow numbers change
-  ['col','milk','oad','peno'].forEach(k => updateGraze(k));
-}
-
-function renderGroup(key, tableId, countId) {
-  const arr = S[key] || [];
-  const countEl = document.getElementById(countId);
-  if (countEl) countEl.textContent = arr.length ? `— ${arr.length} cows` : "";
-  const el = document.getElementById(tableId);
-  if (!el) return;
-  if (!arr.length) { el.innerHTML = ""; return; }
-  const sorted = [...arr].sort((a,b) => a.tag.localeCompare(b.tag, undefined, {numeric:true}));
-  el.innerHTML = `<table style="margin-top:8px">
-    <thead><tr><th>Tag</th><th></th></tr></thead>
-    <tbody>${sorted.map(c=>`
-      <tr>
-        <td><span class="tag">${c.tag}</span></td>
-        <td><button class="del" onclick="delFromGroup('${key}','${c.id}')">✕</button></td>
-      </tr>`).join("")}
-    </tbody></table>`;
-}
-
-// ── Bay modal
-function openBayModal(bay) {
-  _modalBay = bay;
-  document.getElementById("modalBayName").textContent = bay;
-  document.getElementById("modalCount").value = S.bays[bay] || 0;
-  const bm = document.getElementById("bayModal"); bm.classList.remove("hidden"); bm.style.display="flex";
-  setTimeout(() => { const i = document.getElementById("modalCount"); i.focus(); i.select(); }, 50);
-}
-function closeBayModal(e) { if (e.target === document.getElementById("bayModal")) closeBayModalDirect(); }
-function closeBayModalDirect() { const m = document.getElementById("bayModal"); m.classList.add("hidden"); m.style.display="none"; _modalBay = null; }
-function saveBayModal() {
-  const n = parseInt(document.getElementById("modalCount").value);
-  if (!_modalBay || isNaN(n) || n < 0) return;
-  S.bays[_modalBay] = n;
-  closeBayModalDirect();
-  save(); render();
-}
-
-// ── Treatments
-function addTreatment() {
-  const tag = document.getElementById("txTag").value.trim();
-  const loc = document.getElementById("txLoc").value;
-  const reason = document.getElementById("txReason").value.trim();
-  const date = document.getElementById("txDate").value;
-  if (!tag || !reason || !date) return;
-  S.treatments.push({ id: uid(), tag, location: loc, treatment: reason, meatWithholdDate: date });
-  S.treatments.sort((a,b) => a.meatWithholdDate.localeCompare(b.meatWithholdDate));
-  ["txTag","txReason","txDate"].forEach(id => document.getElementById(id).value = "");
-  save(); render();
-}
-function delTx(id) { S.treatments = S.treatments.filter(t=>t.id!==id); save(); render(); }
-
-// ── Lame
-function toggleFoot(code) {
-  const idx = selectedFeet.indexOf(code);
-  if (idx === -1) selectedFeet.push(code); else selectedFeet.splice(idx,1);
-  const map = {"Left Front":"LF","Right Front":"RF","Left Rear":"LR","Right Rear":"RR"};
-  document.querySelectorAll(".foot-btn").forEach(btn => {
-    btn.classList.toggle("selected", selectedFeet.includes(map[btn.textContent.trim()]));
-  });
-}
-
-function addLame() {
-  const tag = document.getElementById("lameTag").value.trim();
-  const loc = document.getElementById("lameLoc").value;
-  const notes = document.getElementById("lameNotes").value.trim();
-  if (!tag || !selectedFeet.length) return;
-  S.lameCows.push({ id: uid(), tag, location: loc, feet: [...selectedFeet], notes, dateAdded: todayStr() });
-  document.getElementById("lameTag").value = "";
-  document.getElementById("lameNotes").value = "";
-  selectedFeet = [];
-  document.querySelectorAll(".foot-btn").forEach(b => b.classList.remove("selected"));
-  save(); render();
-}
-
-const pendingTreats = new Set();
-function treatTap(id) {
-  const btn = document.getElementById("tb-"+id);
-  if (!btn) return;
-  if (pendingTreats.has(id)) {
-    btn.classList.remove("pending"); btn.classList.add("confirmed"); btn.textContent = "✓ Done";
-    pendingTreats.delete(id);
-    setTimeout(() => {
-      const cow = S.lameCows.find(c=>c.id===id); if (!cow) return;
-      S.lameCows = S.lameCows.filter(c=>c.id!==id);
-      S.lameArchive.unshift({ ...cow, clearedDate: todayStr(), id: uid() });
-      save(); render();
-    }, 400);
-  } else {
-    pendingTreats.add(id);
-    btn.classList.add("pending"); btn.textContent = "✓ Treated?";
-    setTimeout(() => {
-      if (pendingTreats.has(id)) {
-        pendingTreats.delete(id);
-        if (btn) { btn.classList.remove("pending"); btn.textContent = "Treated?"; }
-      }
-    }, 3000);
-  }
-}
-function delLame(id) { S.lameCows = S.lameCows.filter(c=>c.id!==id); save(); render(); }
-function delLameArchive(id) { S.lameArchive = S.lameArchive.filter(c=>c.id!==id); save(); render(); }
-
-// ── Calving
-function parseTags(raw) { return raw.split(/[\s,]+/).map(t=>t.trim()).filter(t=>t.length>0); }
-
-function removeDuplicates(tag, excludeGroup) {
-  ALL_GROUPS.forEach(g => {
-    if (g === excludeGroup) return;
-    if (g === 'newMoms') S.newMoms = S.newMoms.filter(x=>x.tag!==tag);
-    else if (g === 'colostrumMob') S.colostrumMob = S.colostrumMob.filter(x=>x.tag!==tag);
-    else if (g === 'watchList') S.watchList = S.watchList.filter(x=>x.tag!==tag);
-    else if (g === 'calvedList') S.calvedList = S.calvedList.filter(x=>x.tag!==tag);
-    else if (S[g]) S[g] = S[g].filter(x=>x.tag!==tag);
-  });
-}
-
-function addMom() {
-  const raw = document.getElementById("momTag").value.trim();
-  const date = document.getElementById("momDate").value || todayStr();
-  if (!raw) return;
-  parseTags(raw).forEach(tag => { removeDuplicates(tag,'newMoms'); S.newMoms.push({ id: uid(), tag, dateLeftBarn: date }); });
-  document.getElementById("momTag").value = "";
-  save(); render();
-}
-function delMom(id) { S.newMoms = S.newMoms.filter(m=>m.id!==id); save(); render(); }
-function momToCol(id) {
-  const m = S.newMoms.find(x=>x.id===id); if (!m) return;
-  removeDuplicates(m.tag,'colostrumMob');
-  S.newMoms = S.newMoms.filter(x=>x.id!==id);
-  S.colostrumMob.push({ id: uid(), tag: m.tag, dateEntered: todayStr() });
-  save(); render();
-}
-function delCol(id) { S.colostrumMob = S.colostrumMob.filter(c=>c.id!==id); save(); render(); }
-function colExit(id, dest) {
-  const c = S.colostrumMob.find(x=>x.id===id); if (!c) return;
-  S.colostrumMob = S.colostrumMob.filter(x=>x.id!==id);
-  if (!S[dest]) S[dest] = [];
-  S[dest].push({ id: uid(), tag: c.tag });
-  save(); render();
-}
-function addToGroup(group, inputId) {
-  const raw = document.getElementById(inputId).value.trim();
-  if (!raw) return;
-  if (!S[group]) S[group] = [];
-  parseTags(raw).forEach(tag => { removeDuplicates(tag, group); S[group].push({ id: uid(), tag }); });
-  document.getElementById(inputId).value = "";
-  save(); render();
-}
-function delFromGroup(group, id) { if (S[group]) { S[group] = S[group].filter(c=>c.id!==id); save(); render(); } }
-
-// ── Grazing calculator
-function updateGraze(mob) {
-  const idMap = {col:'colGraze',milk:'milkGraze',oad:'oadGraze',peno:'penoGraze'};
-  const resMap = {col:'colGrazeResult',milk:'milkGrazeResult',oad:'oadGrazeResult',peno:'penoGrazeResult'};
-  const countMap = {col:S.colostrumMob.length, milk:S.milkingHerd.length, oad:(S.oad||[]).length, peno:(S.peno||[]).length};
-  const input = document.getElementById(idMap[mob]);
-  const resultEl = document.getElementById(resMap[mob]);
-  if (!input || !resultEl) return;
-  const sqm = parseFloat(input.value);
-  const count = countMap[mob];
-  G[mob] = sqm;
-  saveGraze();
-  if (!sqm || count === 0) { resultEl.innerHTML = '—'; return; }
-  const total = sqm * count;
-  const ha = (total / 10000).toFixed(2);
-  resultEl.innerHTML = `${total.toLocaleString()} m²<span>= ${ha} ha for ${count} cows</span>`;
-}
-
-function initGraze() {
-  const fields = {col:'colGraze',milk:'milkGraze',oad:'oadGraze',peno:'penoGraze'};
-  Object.entries(fields).forEach(([k,id]) => { const el = document.getElementById(id); if (el) el.value = G[k] || ''; });
-  ['col','milk','oad','peno'].forEach(k => updateGraze(k));
-}
-
-// ── Remove Cow
-function removeCow() {
-  const tag = document.getElementById('removeCowTag').value.trim();
-  const date = document.getElementById('removeCowDate').value || todayStr();
-  const notes = document.getElementById('removeCowNotes').value.trim();
-  const status = document.getElementById('removeCowStatus');
-  if (!tag) { status.style.color='var(--red)'; status.textContent='Enter a tag number'; setTimeout(()=>status.textContent='',2000); return; }
-
-  // Remove from all active groups
-  const groups = ['newMoms','colostrumMob','milkingHerd','oad','peno','watchList','lameCows'];
-  groups.forEach(g => { if (S[g]) S[g] = S[g].filter(x => x.tag !== tag); });
-  // Also remove from treatments
-  S.treatments = S.treatments.filter(t => t.tag !== tag);
-
-  // Record death
-  if (!S.cowDeaths) S.cowDeaths = [];
-  S.cowDeaths.unshift({ id: uid(), tag, date, notes });
-
-  document.getElementById('removeCowTag').value = '';
-  document.getElementById('removeCowNotes').value = '';
-  save(); render();
-  status.style.color='var(--green)'; status.textContent=`✓ Tag ${tag} removed and death recorded`;
-  setTimeout(()=>status.textContent='',3000);
-  renderCowDeathList();
-}
-
-function renderCowDeathList() {
-  const el = document.getElementById('cowDeathList');
-  if (!el) return;
-  const deaths = S.cowDeaths || [];
-  if (!deaths.length) { el.innerHTML=''; return; }
-  el.innerHTML = `<div style="font-family:'JetBrains Mono',monospace;font-size:.66rem;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Cow death register (${deaths.length})</div>
-    <table>
-      <thead><tr><th>Tag</th><th>Date</th><th>Notes</th><th></th></tr></thead>
-      <tbody>${deaths.map(d=>`
-        <tr>
-          <td><span class="tag">${d.tag}</span></td>
-          <td style="font-size:.72rem">${fmtDate(d.date)}</td>
-          <td style="font-size:.72rem;color:var(--muted)">${d.notes||'—'}</td>
-          <td><button class="del" onclick="delCowDeath('${d.id}')">✕</button></td>
-        </tr>`).join('')}
-      </tbody>
-    </table>`;
-}
-
-function delCowDeath(id) {
-  S.cowDeaths = (S.cowDeaths||[]).filter(d=>d.id!==id);
-  save(); renderCowDeathList();
-}
-
-// ── Export
-function doExport() {
-  const lameSummary = !S.lameCows.length ? "(none)" :
-    S.lameCows.map(c=>`Tag ${c.tag} | ${c.location} | ${c.feet.map(f=>FOOT_LABELS[f]).join(", ")}${c.notes?" | "+c.notes:""}`).join("\n");
-  const summary = [
-    `DAIRY ASSISTANT EXPORT — ${new Date().toLocaleString('en-NZ', {timeZone:'Pacific/Auckland'})}`,
-    "", "=== BAY TOTALS ===",
-    ...BAYS.map(b=>`${b}: ${S.bays[b]||0}`),
-    `TOTAL: ${bayTotal()}`,
-    "", "=== DRY COW TREATMENTS ===",
-    !S.treatments.length?"(none)":S.treatments.map(t=>`Tag ${t.tag} | ${t.location} | ${t.treatment} | Clear: ${fmtDate(t.meatWithholdDate)}`).join("\n"),
-    "", "=== LAME COWS ===", lameSummary,
-    "", "=== NEW MOMS ===",
-    !S.newMoms.length?"(none)":S.newMoms.map(m=>`Tag ${m.tag} | Left barn: ${fmtDate(m.dateLeftBarn)}`).join("\n"),
-    "", "=== COLOSTRUM MOB ===",
-    !S.colostrumMob.length?"(none)":S.colostrumMob.map(c=>`Tag ${c.tag} | Entered: ${fmtDate(c.dateEntered)} | Days: ${daysSince(c.dateEntered)}`).join("\n"),
-    "", "=== MILKING HERD ===",
-    `Total: ${S.milkingHerd.length}`,
-    !S.milkingHerd.length?"(none)":S.milkingHerd.map(c=>`Tag ${c.tag}`).join(", "),
-    "", "=== OAD ===",
-    `Total: ${(S.oad||[]).length}`,
-    !(S.oad||[]).length?"(none)":(S.oad||[]).map(c=>`Tag ${c.tag}`).join(", "),
-    "", "=== PENO ===",
-    `Total: ${(S.peno||[]).length}`,
-    !(S.peno||[]).length?"(none)":(S.peno||[]).map(c=>`Tag ${c.tag}`).join(", "),
-    "", "=== WATCH LIST ===",
-    !S.watchList.length?"(none)":S.watchList.map(w=>`Tag ${w.tag} | ${w.location||"?"} | ${w.status}`).join("\n"),
-    "", "=== CALVED LIST ===",
-    !S.calvedList.length?"(none)":S.calvedList.map(c=>`Tag ${c.tag} | ${fmtDate(c.dateCalved)} | Sex: ${c.sex||'?'} | Type: ${c.calfType||'?'}${c.keeperTag?' | Keeper tag: '+c.keeperTag:''}`).join("\n"),
-    "", "=== COW DEATHS ===",
-    !(S.cowDeaths||[]).length?"(none)":(S.cowDeaths||[]).map(d=>`Tag ${d.tag} | ${fmtDate(d.date)}${d.notes?' | '+d.notes:''}`).join("\n"),
-    "", "=== IMPORT CODE ===",
-    "DAIRY_IMPORT:" + JSON.stringify(S),
-  ].join("\n");
-  const box = document.getElementById("exportBox");
-  box.textContent = summary;
-  box.classList.remove("hidden");
-  navigator.clipboard?.writeText(summary).catch(()=>{});
-}
-
-// ── Import
-async function doImport() {
-  const raw = document.getElementById("importBox").value.trim();
-  const status = document.getElementById("importStatus");
-  if (!raw) { status.style.color="var(--red)"; status.textContent="✕ Nothing pasted"; setTimeout(()=>status.textContent="",3000); return; }
-  try {
-    let jsonStr = raw;
-    const marker = raw.indexOf("DAIRY_IMPORT:");
-    if (marker !== -1) jsonStr = raw.slice(marker+13).trim();
-    const start = jsonStr.indexOf("{"); const end = jsonStr.lastIndexOf("}");
-    if (start===-1||end===-1) throw new Error();
-    const imported = JSON.parse(jsonStr.slice(start,end+1));
-    if (!imported.bays) throw new Error();
-    ['treatments','newMoms','colostrumMob','milkingHerd','oad','peno','lameCows','lameArchive','watchList','calvedList','calvingHistory','usedKeeperTags','cowDeaths']
-      .forEach(k => { imported[k] = imported[k] || []; });
-    // Pause the Firestore listener while we write
-    if (_unsubscribe) { _unsubscribe(); _unsubscribe = null; }
-    S = imported;
-    // Write directly to Firestore and wait for it to complete
-    await window._setDoc(window._DATA_DOC, S);
-    document.getElementById("importBox").value = "";
-    status.style.color="var(--green)"; status.textContent="✓ Imported";
-    setTimeout(()=>status.textContent="",3000);
-    render();
-    // Re-attach the listener
-    _unsubscribe = window._onSnapshot(window._DATA_DOC, snap => {
-      if (snap.exists()) {
-        const d = snap.data();
-        ['treatments','newMoms','colostrumMob','milkingHerd','oad','peno','lameCows','lameArchive']
-          .forEach(k => { d[k] = d[k] || []; });
-        S = d;
-      }
-      setSyncStatus('live');
-      render();
-      if (currentTab === 3) setTimeout(initGraze, 50);
-    });
-    window._unsubscribe = _unsubscribe;
-  } catch(e) {
-    status.style.color="var(--red)"; status.textContent="✕ Invalid — check and try again";
-    setTimeout(()=>status.textContent="",4000);
-  }
-}
-
-// ── Calf tally (in-memory scratchpad, not persisted)
-const _tally = {H:0, B:0, HF:0};
-function tallyInc(k) { _tally[k]++; tallyRender(); }
-function tallyDec(k) { if (_tally[k] > 0) _tally[k]--; tallyRender(); }
-function tallyReset() { _tally.H=0; _tally.B=0; _tally.HF=0; tallyRender(); }
-function tallyRender() {
-  const h = document.getElementById('tallyH');
-  const b = document.getElementById('tallyB');
-  const hf = document.getElementById('tallyHF');
-  const tot = document.getElementById('tallyTotal');
-  if (h) h.textContent = _tally.H;
-  if (b) b.textContent = _tally.B;
-  if (hf) hf.textContent = _tally.HF;
-  if (tot) tot.textContent = _tally.H + _tally.B + _tally.HF;
-}
-
-// ── Keyboard
-document.addEventListener("keydown", e => {
-  if (e.key==="Enter" && _modalBay) { saveBayModal(); return; }
-  if (e.key==="Escape" && _modalBay) { closeBayModalDirect(); return; }
-  if (e.key !== "Enter") return;
-  if (currentTab===1) addTreatment();
 });
 
-// ── Init
-document.getElementById("momDate").value = todayStr();
-document.getElementById("removeCowDate").value = todayStr();
+function setupForRole(){
+  const helperOnly = currentRole === 'helper';
+  document.querySelectorAll('nav.bottom button').forEach(btn=>{
+    btn.style.display = (!helperOnly || btn.dataset.screen === 'push') ? '' : 'none';
+  });
+  showScreen(helperOnly ? 'push' : 'today');
+}
+
+/* ============ FIRESTORE LISTENERS ============ */
+function attachListeners(){
+  unsubscribers.push(db.collection('pushList').onSnapshot(snap=>{
+    DATA.pushList = snap.docs.map(d=>({ id: d.id, ...d.data() }));
+    renderPush();
+  }, err=>toast('Push list sync error: '+err.message)));
+
+  if(currentRole === 'admin'){
+    unsubscribers.push(db.collection('calves').onSnapshot(snap=>{
+      DATA.calves = snap.docs.map(d=>({ id: d.id, ...d.data() }));
+      renderAll();
+    }, err=>toast('Calves sync error: '+err.message)));
+
+    unsubscribers.push(db.collection('treatments').onSnapshot(snap=>{
+      DATA.treatments = snap.docs.map(d=>({ id: d.id, ...d.data() }));
+      renderTreatments();
+    }, err=>toast('Treatments sync error: '+err.message)));
+
+    unsubscribers.push(db.collection('deaths').onSnapshot(snap=>{
+      DATA.deaths = snap.docs.map(d=>({ id: d.id, ...d.data() }));
+      renderDeaths();
+    }, err=>toast('Deaths sync error: '+err.message)));
+
+    unsubscribers.push(db.collection('meta').doc('settings').onSnapshot(doc=>{
+      const d = doc.data() || {};
+      DATA.lastShed = d.lastShed || 1;
+      DATA.lastBobbyPen = d.lastBobbyPen || 1;
+      DATA.unit = d.unit || 'L';
+      const unitLBtn = document.getElementById('unitL');
+      const unitKgBtn = document.getElementById('unitKg');
+      if(unitLBtn){ unitLBtn.classList.toggle('active', DATA.unit==='L'); }
+      if(unitKgBtn){ unitKgBtn.classList.toggle('active', DATA.unit==='kg'); }
+      renderAll();
+    }, err=>toast('Settings sync error: '+err.message)));
+  }
+}
+function detachListeners(){
+  unsubscribers.forEach(u=>u());
+  unsubscribers = [];
+}
+
+/* ============ HELPERS ============ */
+function todayStr(){
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  const dd = String(d.getDate()).padStart(2,'0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+function ageInDays(birthDateStr, onDate){
+  const d0 = new Date(birthDateStr+'T00:00:00');
+  const d1 = new Date((onDate||todayStr())+'T00:00:00');
+  return Math.round((d1-d0)/86400000);
+}
+function fmtDate(d){
+  const dt = new Date(d+'T00:00:00');
+  return dt.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+}
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(()=>t.classList.remove('show'), 1800);
+}
+
+/* ============ FEED CALCULATIONS ============ */
+// Draws a straight line between consecutive {day, litres} points. Two points on the
+// same day means an instant jump. Past the last point: 'hold' stays flat there,
+// 'zero' drops to nothing — this is how every feed-plan change gets expressed.
+function interpolateMilestones(milestones, age, afterBehavior){
+  if(age <= milestones[0].day) return milestones[0].litres;
+  for(let i=1;i<milestones.length;i++){
+    if(age <= milestones[i].day){
+      const prev = milestones[i-1], curr = milestones[i];
+      if(curr.day === prev.day) return curr.litres;
+      const frac = (age - prev.day) / (curr.day - prev.day);
+      return prev.litres + frac*(curr.litres - prev.litres);
+    }
+  }
+  return afterBehavior === 'zero' ? 0 : milestones[milestones.length-1].litres;
+}
+
+function litresForCalf(calf, onDate){
+  const today = onDate || todayStr();
+  if(calf.type === 'keeper'){
+    const age = ageInDays(calf.birthDate, today);
+    if(age < 0) return 0;
+    if(age === 0) return 0; // colostrum day, excluded from forecast
+
+    // Manual wean (triggered by weight, not age) overrides the normal curve entirely.
+    if(calf.weanDate){
+      const weanAge = ageInDays(calf.weanDate, today);
+      if(weanAge >= 0){
+        return interpolateMilestones(CONFIG.keeper.weanMilestones, weanAge, 'zero');
+      }
+      // weanAge < 0 shouldn't occur — fall through to the normal curve as a guard
+    }
+
+    return interpolateMilestones(CONFIG.keeper.milestones, age, 'hold');
+  }
+  if(calf.type === 'bobby'){
+    // Genuine D1/D2 bobbies and Hereford-origin calves alike — fed until Cleared
+    // or moved to the Hereford mob, however many days that takes. No auto cutoff.
+    const age = ageInDays(calf.birthDate, today);
+    if(age < 0) return 0;
+    return age === 0 ? CONFIG.bobby.day0L : CONFIG.bobby.fullL;
+  }
+  if(calf.type === 'hereford'){
+    // moveDate is when it was pulled from the bobby pens into the mob.
+    // Same-day rule as keepers: already fed as a bobby that morning, so the
+    // flat 7L rate only starts the day after the move.
+    const moveAge = ageInDays(calf.moveDate, today);
+    if(moveAge < 0) return 0;
+    if(moveAge === 0) return CONFIG.bobby.fullL;
+    return CONFIG.hereford.fullL;
+  }
+  return 0;
+}
+function litresToDisplay(l){
+  if(DATA.unit === 'kg') return (l*CONFIG.gramsPerLitre/1000);
+  return l;
+}
+function fmtKeeper(l){
+  // Keepers are on milk replacer powder — this is the only group the L/kg toggle applies to
+  const v = litresToDisplay(l);
+  return v.toFixed(1) + (DATA.unit==='kg' ? ' kg' : ' L');
+}
+function fmtLitres(l){
+  // Bobbies and Herefords are whole milk only — always litres, toggle doesn't apply
+  return l.toFixed(1) + ' L';
+}
+
+/* ============ TAG POOLS ============ */
+function availableTags(farm){
+  const pool = CONFIG.tagPools[farm];
+  const used = new Set(DATA.calves.filter(c=>c.type==='keeper' && c.farm===farm).map(c=>c.tag));
+  const out = [];
+  for(let t=pool.min; t<=pool.max; t++){ if(!used.has(t)) out.push(t); }
+  return out;
+}
+
+/* ============ UNIT TOGGLE ============ */
+function setUnit(u){
+  document.getElementById('unitL').classList.toggle('active', u==='L');
+  document.getElementById('unitKg').classList.toggle('active', u==='kg');
+  db.collection('meta').doc('settings').set({unit:u}, {merge:true}).catch(err=>toast('Error: '+err.message));
+}
+
+/* ============ NAV ============ */
+function showScreen(name){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById('screen-'+name).classList.add('active');
+  document.querySelectorAll('nav.bottom button').forEach(b=>b.classList.toggle('active', b.dataset.screen===name));
+  const titles = {today:['Calf Assistant',"Today"], births:['Log a Birth','Record New Calves'], bobbies:['Pens','Bobby Pens'], push:['Keepers','Pushing List'], treatments:['Health Register','Treatments'], deaths:['Records','Death Register'], lookup:['Records','Tag Lookup'], share:['Records','Share & Backup']};
+  document.getElementById('headerEyebrow').textContent = titles[name][0];
+  document.getElementById('headerTitle').textContent = titles[name][1];
+  renderAll();
+}
+
+/* ============ RENDER: TODAY ============ */
+let todayFeedOpen = false;
+function toggleTodayFeed(){ todayFeedOpen = !todayFeedOpen; renderToday(); }
+
+function renderToday(){
+  const el = document.getElementById('screen-today');
+  const today = todayStr();
+  const bobbies = DATA.calves.filter(c=>c.type==='bobby' && (!c.cleared || c.clearedDate===today) && ageInDays(c.birthDate,today) >= 0);
+  const herefords = DATA.calves.filter(c=>c.type==='hereford' && ageInDays(c.moveDate,today) >= 0);
+  const keepers = DATA.calves.filter(c=>c.type==='keeper' && ageInDays(c.birthDate,today) >= 0);
+
+  const bobbyTotal = bobbies.reduce((s,c)=>s+litresForCalf(c,today),0);
+  const herefordTotal = herefords.reduce((s,c)=>s+litresForCalf(c,today),0);
+  const keeperTotal = keepers.reduce((s,c)=>s+litresForCalf(c,today),0);
+  const grandTotal = bobbyTotal+herefordTotal+keeperTotal;
+
+  let shedRows = '';
+  CONFIG.sheds.forEach(s=>{
+    const shedCalves = keepers.filter(c=>c.shed===s);
+    const shedTotal = shedCalves.reduce((sum,c)=>sum+litresForCalf(c,today),0);
+    shedRows += `<div class="shed-row"><span>${shedName(s)} · ${shedCalves.length} head</span><strong>${fmtKeeper(shedTotal)}</strong></div>`;
+  });
+
+  const bobbyD1 = bobbies.filter(c=>c.farm==='D1').length;
+  const bobbyD2 = bobbies.filter(c=>c.farm==='D2').length;
+  const bobbyHF = bobbies.filter(c=>c.farm==='HF').length;
+  const overdueCount = bobbies.filter(c=>ageInDays(c.birthDate,today) >= CONFIG.bobby.overdueDays).length;
+
+  // Herd summary (always visible)
+  const keepersD1 = keepers.filter(c=>c.farm==='D1').length;
+  const keepersD2 = keepers.filter(c=>c.farm==='D2').length;
+  const deathsTotal = DATA.deaths.length;
+  const day4D1 = bobbies.filter(c=>c.farm==='D1' && ageInDays(c.birthDate,today)===4).length;
+  const day4D2 = bobbies.filter(c=>c.farm==='D2' && ageInDays(c.birthDate,today)===4).length;
+  const day5D1 = bobbies.filter(c=>c.farm==='D1' && ageInDays(c.birthDate,today)===5).length;
+  const day5D2 = bobbies.filter(c=>c.farm==='D2' && ageInDays(c.birthDate,today)===5).length;
+
+  el.innerHTML = `
+    <div class="card">
+      <h2>Keepers</h2>
+      <div class="shed-row"><span>D1</span><strong>${keepersD1}</strong></div>
+      <div class="shed-row"><span>D2</span><strong>${keepersD2}</strong></div>
+      <div class="shed-row" style="font-weight:700;border-top:1px solid var(--line);"><span>Total</span><strong>${keepersD1+keepersD2}</strong></div>
+    </div>
+
+    <div class="card">
+      <h2>Bobbies</h2>
+      <div class="shed-row"><span>D1</span><strong>${bobbyD1}</strong></div>
+      <div class="shed-row"><span>D2</span><strong>${bobbyD2}</strong></div>
+      <div class="muted" style="margin-top:12px;font-weight:700;">Day 4</div>
+      <div class="shed-row"><span>D1</span><strong>${day4D1}</strong></div>
+      <div class="shed-row"><span>D2</span><strong>${day4D2}</strong></div>
+      <div class="muted" style="margin-top:12px;font-weight:700;">Day 5</div>
+      <div class="shed-row"><span>D1</span><strong>${day5D1}</strong></div>
+      <div class="shed-row"><span>D2</span><strong>${day5D2}</strong></div>
+    </div>
+
+    <div class="card">
+      <h2>Deaths this season</h2>
+      <div style="font-family:'Fraunces',serif;font-size:28px;font-weight:600;margin-top:4px;">${deathsTotal}</div>
+    </div>
+
+    <div class="card">
+      <div class="section-toggle ${todayFeedOpen?'open':''}" onclick="toggleTodayFeed()">
+        <h2>Today's feed${todayFeedOpen ? '' : ' — '+fmtLitres(grandTotal)}</h2>
+        <span class="chev">▾</span>
+      </div>
+      <div class="collapsible ${todayFeedOpen?'open':''}" style="${todayFeedOpen?'margin-top:14px;':''}">
+        <div class="mob-card keeper">
+          <div class="label">Keepers · ${keepers.length} head</div>
+          <div class="amount">${fmtKeeper(keeperTotal)}</div>
+          <div class="sub">Ramps to ${CONFIG.keeper.milestones[1].litres}L by day ${CONFIG.keeper.milestones[1].day}, holds till day ${CONFIG.keeper.milestones[2].day}, settles at ${CONFIG.keeper.milestones[3].litres}L by day ${CONFIG.keeper.milestones[3].day} · powder or milk</div>
+          ${shedRows}
+        </div>
+        <div class="mob-card bobby">
+          <div class="label">Bobbies · ${bobbies.length} head</div>
+          <div class="amount">${fmtLitres(bobbyTotal)}</div>
+          <div class="sub">${CONFIG.bobby.day0L}L day 1, then ${CONFIG.bobby.fullL}L/day until cleared or moved to Herefords · milk only</div>
+          <div class="shed-row"><span>D1: ${bobbyD1} · D2: ${bobbyD2} · Hereford: ${bobbyHF}</span>${overdueCount>0?`<strong style="color:var(--danger);">${overdueCount} overdue</strong>`:''}</div>
+        </div>
+        <div class="mob-card hereford">
+          <div class="label">Hereford mob · ${herefords.length} head</div>
+          <div class="amount">${fmtLitres(herefordTotal)}</div>
+          <div class="sub">Flat ${CONFIG.hereford.fullL}L/day from the day after they're moved from the bobby pens · milk only</div>
+        </div>
+        <div class="grand-total">
+          <span>Total today (litres)</span>
+          <span class="amount">${fmtLitres(grandTotal)}</span>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+/* ============ RENDER: BIRTHS ============ */
+let birthState = { type:null, farm:null, selectedTags:new Set(), shed:null, pen:null, date: todayStr() };
+
+function renderBirths(){
+  const el = document.getElementById('screen-births');
+  const recent = DATA.calves.filter(c=>c.birthDate===birthState.date).slice(-30).reverse();
+
+  let recentHtml = recent.length ? recent.map(c=>`
+    <div class="list-item">
+      <span><span class="pill ${c.type}">${c.type}</span> ${c.tag ? '#'+c.tag+' · ' : ''}${c.farm ? (CONFIG.bobbyFarms[c.farm]||c.farm) : ''} ${c.shed?('· '+shedName(c.shed)):''}${c.pen?('· Pen '+c.pen):''}</span>
+      <button class="btn btn-sm btn-danger" onclick="undoCalf('${c.id}')">Remove</button>
+    </div>
+  `).join('') : '<div class="empty">No calves logged for this date yet.</div>';
+
+  el.innerHTML = `
+    <div class="card">
+      <label>Date</label>
+      <input type="date" id="birthDate" value="${birthState.date}" onchange="birthState.date=this.value; renderBirths();">
+
+      <label>Type</label>
+      <div class="type-picker">
+        <button class="keeper ${birthState.type==='keeper'?'selected':''}" onclick="pickType('keeper')">Keeper</button>
+        <button class="bobby ${birthState.type==='bobby'?'selected':''}" onclick="pickType('bobby')">Bobby</button>
+      </div>
+
+      <div id="birthFormBody"></div>
+    </div>
+
+    <div class="card">
+      <h2>Logged on ${fmtDate(birthState.date)}</h2>
+      ${recentHtml}
+    </div>
+  `;
+  renderBirthFormBody();
+}
+
+function pickType(t){
+  birthState.type = t;
+  birthState.farm = null;
+  birthState.pen = null;
+  birthState.selectedTags = new Set();
+  renderBirths();
+}
+
+function renderBirthFormBody(){
+  const body = document.getElementById('birthFormBody');
+  if(!body) return;
+  if(!birthState.type){ body.innerHTML=''; return; }
+
+  if(birthState.type === 'bobby'){
+    let html = `<label>Farm</label>
+      <div class="farm-picker">
+        <button class="${birthState.farm==='D1'?'selected':''}" onclick="pickFarm('D1')">D1</button>
+        <button class="${birthState.farm==='D2'?'selected':''}" onclick="pickFarm('D2')">D2</button>
+        <button class="${birthState.farm==='HF'?'selected':''}" onclick="pickFarm('HF')">Hereford</button>
+      </div>`;
+    if(birthState.farm){
+      html += `<label>How many born?</label>
+        <input type="number" id="countInput" min="1" placeholder="e.g. 8">
+        <label>Pen</label>
+        <div class="shed-picker">
+          ${CONFIG.bobbyPens.map(p=>`<button class="${(birthState.pen||DATA.lastBobbyPen)===p?'selected':''}" onclick="pickBobbyPen(${p})">Pen ${p}</button>`).join('')}
+        </div>
+        <div style="margin-top:14px;">
+          <button class="btn btn-primary" onclick="saveBobby()">Save Bobbies</button>
+        </div>`;
+    }
+    body.innerHTML = html;
+    return;
+  }
+
+  // Keeper flow
+  let html = `<label>Farm</label>
+    <div class="farm-picker">
+      <button class="${birthState.farm==='D1'?'selected':''}" onclick="pickFarm('D1')">D1 (1–350)</button>
+      <button class="${birthState.farm==='D2'?'selected':''}" onclick="pickFarm('D2')">D2 (5001–5350)</button>
+    </div>`;
+
+  if(birthState.farm){
+    const avail = availableTags(birthState.farm);
+    html += `<label>Tap tag numbers (${birthState.selectedTags.size} selected)</label>
+      <div class="tag-grid">
+        ${avail.length ? avail.map(t=>`<div class="tag-chip ${birthState.selectedTags.has(t)?'selected':''}" onclick="toggleTag(${t})">${t}</div>`).join('') : '<div class="empty">No tags left in this pool.</div>'}
+      </div>`;
+
+    html += `<label>Shed</label>
+      <div class="shed-picker">
+        ${CONFIG.sheds.map(s=>`<button class="${(birthState.shed||DATA.lastShed)===s?'selected':''}" onclick="pickShed(${s})">${shedName(s)}</button>`).join('')}
+      </div>`;
+
+    html += `<div style="margin-top:14px;">
+      <button class="btn btn-primary" onclick="saveKeepers()" ${birthState.selectedTags.size===0?'disabled':''}>Save ${birthState.selectedTags.size||''} Keeper${birthState.selectedTags.size===1?'':'s'}</button>
+    </div>`;
+  }
+  body.innerHTML = html;
+}
+
+function pickFarm(f){ birthState.farm=f; birthState.selectedTags=new Set(); renderBirthFormBody(); }
+function toggleTag(t){
+  if(birthState.selectedTags.has(t)) birthState.selectedTags.delete(t);
+  else birthState.selectedTags.add(t);
+  renderBirthFormBody();
+}
+function pickShed(s){ birthState.shed = s; renderBirthFormBody(); }
+function pickBobbyPen(p){ birthState.pen = p; renderBirthFormBody(); }
+
+function saveBobby(){
+  const n = parseInt(document.getElementById('countInput').value, 10);
+  if(!n || n<1){ toast('Enter a number first'); return; }
+  if(!birthState.farm){ toast('Pick a farm first'); return; }
+  const pen = birthState.pen || DATA.lastBobbyPen;
+  const batch = db.batch();
+  for(let i=0;i<n;i++){
+    const ref = db.collection('calves').doc(uid());
+    batch.set(ref, { type:'bobby', farm: birthState.farm, tag:null, shed:null, pen: pen, cleared:false, birthDate: birthState.date });
+  }
+  batch.set(db.collection('meta').doc('settings'), {lastBobbyPen: pen}, {merge:true});
+  batch.commit().then(()=>{
+    toast(`${n} bobbies logged to Pen ${pen}`);
+  }).catch(err=>toast('Error: '+err.message));
+  birthState.type = null; birthState.farm = null; birthState.pen = null;
+  renderBirths();
+}
+
+function saveKeepers(){
+  if(birthState.selectedTags.size===0) return;
+  const shed = birthState.shed || DATA.lastShed;
+  const count = birthState.selectedTags.size;
+  const batch = db.batch();
+  birthState.selectedTags.forEach(t=>{
+    const ref = db.collection('calves').doc(uid());
+    batch.set(ref, { type:'keeper', farm: birthState.farm, tag: t, shed: shed, birthDate: birthState.date });
+  });
+  batch.set(db.collection('meta').doc('settings'), {lastShed: shed}, {merge:true});
+  batch.commit().then(()=>{
+    toast(`${count} keeper(s) added to Shed ${shed}`);
+  }).catch(err=>toast('Error: '+err.message));
+  birthState.selectedTags = new Set();
+  renderBirths();
+}
+
+function undoCalf(id){
+  db.collection('calves').doc(id).delete().catch(err=>toast('Error: '+err.message));
+}
+
+/* ============ RENDER: TREATMENTS ============ */
+let treatFormOpen = false;
+function renderTreatments(){
+  const el = document.getElementById('screen-treatments');
+  const today = todayStr();
+  const active = DATA.treatments.filter(t=>{
+    const start = new Date(t.startDate+'T00:00:00');
+    const end = new Date(start.getTime() + (t.days-1)*86400000);
+    const now = new Date(today+'T00:00:00');
+    return now >= start && now <= end && t.tags.length>0;
+  });
+  const upcoming = DATA.treatments.filter(t=> new Date(t.startDate+'T00:00:00') > new Date(today+'T00:00:00') && t.tags.length>0);
+  const past = DATA.treatments.filter(t=>{
+    const start = new Date(t.startDate+'T00:00:00');
+    const end = new Date(start.getTime() + (t.days-1)*86400000);
+    return end < new Date(today+'T00:00:00') || t.tags.length===0;
+  });
+
+  function dayLabel(t){
+    const d = ageInDays(t.startDate) + 1;
+    return `Day ${Math.max(d,0)} of ${t.days}`;
+  }
+  function treatCard(t){
+    return `
+      <div class="treat-card">
+        <div class="top-row">
+          <h3>${t.treatmentType}</h3>
+          <span class="day-count">${dayLabel(t)}</span>
+        </div>
+        <div class="tag-list">
+          ${t.tags.map(tag=>`<span>#${tag} <button onclick="removeTagFromTreatment('${t.id}','${tag}')">×</button></span>`).join('')}
+        </div>
+        ${t.notes?`<div class="muted">${t.notes}</div>`:''}
+        <div class="btn-row" style="margin-top:8px;">
+          <button class="btn btn-sm btn-outline" onclick="addTagsToTreatment('${t.id}')">+ Add calves</button>
+          <button class="btn btn-sm btn-danger" onclick="cancelTreatment('${t.id}')">Cancel treatment</button>
+        </div>
+      </div>`;
+  }
+
+  el.innerHTML = `
+    <div class="card">
+      <div class="section-toggle ${treatFormOpen?'open':''}" onclick="toggleTreatForm()">
+        <h2>Log a new treatment</h2>
+        <span class="chev">▾</span>
+      </div>
+      <div class="collapsible ${treatFormOpen?'open':''}">
+        <label>Treatment type</label>
+        <input type="text" id="treatType" placeholder="e.g. Scours, Pneumonia, Navel ill">
+        <label>Calf tag numbers</label>
+        <input type="text" id="treatTags" placeholder="e.g. 12, 45, 108">
+        <label>Start date</label>
+        <input type="date" id="treatStart" value="${today}">
+        <label>Duration (days)</label>
+        <input type="number" id="treatDays" min="1" value="3">
+        <label>Notes (optional)</label>
+        <textarea id="treatNotes" placeholder="Dosage, drug used, anything worth flagging"></textarea>
+        <div style="margin-top:14px;">
+          <button class="btn btn-primary" onclick="saveTreatment()">Save treatment</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Due today (${active.length})</h2>
+      ${active.length ? active.map(treatCard).join('') : '<div class="empty">No treatments due today.</div>'}
+    </div>
+
+    ${upcoming.length ? `<div class="card"><h2>Upcoming</h2>${upcoming.map(treatCard).join('')}</div>` : ''}
+    ${past.length ? `<div class="card"><h2>Past</h2>${past.slice(-15).reverse().map(t=>`
+      <div class="list-item"><span>${t.treatmentType} — ${t.tags.length} calf/calves</span><span class="meta">${fmtDate(t.startDate)}</span></div>
+    `).join('')}</div>` : ''}
+  `;
+}
+function toggleTreatForm(){ treatFormOpen = !treatFormOpen; renderTreatments(); }
+
+function saveTreatment(){
+  const type = document.getElementById('treatType').value.trim();
+  const tagsRaw = document.getElementById('treatTags').value.trim();
+  const start = document.getElementById('treatStart').value;
+  const days = parseInt(document.getElementById('treatDays').value,10);
+  const notes = document.getElementById('treatNotes').value.trim();
+  if(!type || !tagsRaw || !days){ toast('Fill in type, tags and duration'); return; }
+  const tags = tagsRaw.split(/[,\s]+/).filter(Boolean);
+  db.collection('treatments').doc(uid()).set({ treatmentType:type, tags, startDate:start, days, notes })
+    .then(()=>toast(`Treatment logged for ${tags.length} calf/calves`))
+    .catch(err=>toast('Error: '+err.message));
+  treatFormOpen = false;
+  renderTreatments();
+}
+function removeTagFromTreatment(id, tag){
+  const t = DATA.treatments.find(x=>x.id===id);
+  if(!t) return;
+  const newTags = t.tags.filter(x=>x!==tag);
+  db.collection('treatments').doc(id).update({tags:newTags}).catch(err=>toast('Error: '+err.message));
+}
+function addTagsToTreatment(id){
+  const more = prompt('Add tag numbers (comma or space separated):');
+  if(!more) return;
+  const t = DATA.treatments.find(x=>x.id===id);
+  if(!t) return;
+  const newTags = more.split(/[,\s]+/).filter(Boolean);
+  const merged = [...new Set([...t.tags, ...newTags])];
+  db.collection('treatments').doc(id).update({tags:merged}).catch(err=>toast('Error: '+err.message));
+}
+function cancelTreatment(id){
+  if(!confirm('Cancel this whole treatment?')) return;
+  db.collection('treatments').doc(id).delete().catch(err=>toast('Error: '+err.message));
+}
+
+/* ============ RENDER: DEATHS ============ */
+function renderDeaths(){
+  const el = document.getElementById('screen-deaths');
+  const list = [...DATA.deaths].reverse();
+  el.innerHTML = `
+    <div class="card">
+      <h2>Record a death</h2>
+      <label>Calf tag number</label>
+      <input type="text" id="deathTag" placeholder="e.g. 214 or 5087">
+      <label>Date of death</label>
+      <input type="date" id="deathDate" value="${todayStr()}">
+      <label>Reason</label>
+      <input type="text" id="deathReason" placeholder="e.g. Scours, found dead, unknown">
+      <div style="margin-top:14px;">
+        <button class="btn btn-primary" onclick="saveDeath()">Save record</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Death register (${DATA.deaths.length})</h2>
+      ${list.length ? list.map(d=>`
+        <div class="list-item">
+          <span>#${d.tag} — ${d.reason}</span>
+          <span class="meta">${fmtDate(d.date)}</span>
+        </div>
+      `).join('') : '<div class="empty">No deaths recorded.</div>'}
+    </div>
+  `;
+}
+function saveDeath(){
+  const tag = document.getElementById('deathTag').value.trim();
+  const date = document.getElementById('deathDate').value;
+  const reason = document.getElementById('deathReason').value.trim();
+  if(!tag || !reason){ toast('Enter a tag and reason'); return; }
+  db.collection('deaths').doc(uid()).set({ tag, date, reason })
+    .then(()=>toast('Death recorded'))
+    .catch(err=>toast('Error: '+err.message));
+}
+
+/* ============ RENDER: LOOKUP ============ */
+function renderLookup(){
+  const el = document.getElementById('screen-lookup');
+  el.innerHTML = `
+    <div class="card">
+      <h2>Find a calf by tag</h2>
+      <input type="text" id="lookupInput" placeholder="Enter tag number" oninput="doLookup()">
+      <div id="lookupResult" style="margin-top:14px;"></div>
+    </div>
+  `;
+}
+function doLookup(){
+  const val = document.getElementById('lookupInput').value.trim();
+  const resultEl = document.getElementById('lookupResult');
+  if(!val){ resultEl.innerHTML=''; return; }
+  const calf = DATA.calves.find(c => String(c.tag) === val);
+  if(!calf){ resultEl.innerHTML = '<div class="empty">No keeper found with that tag.</div>'; return; }
+  const age = ageInDays(calf.birthDate);
+  const today = fmtKeeper(litresForCalf(calf));
+  const deaths = DATA.deaths.filter(d=>d.tag===val);
+  const treatments = DATA.treatments.filter(t=>t.tags.includes(val));
+  const note = calf.note || '';
+
+  let weanSection = '';
+  const weanDeclineDays = CONFIG.keeper.weanMilestones[CONFIG.keeper.weanMilestones.length-1].day;
+  const weanFromL = CONFIG.keeper.weanMilestones[0].litres;
+  const weanToL = CONFIG.keeper.weanMilestones[CONFIG.keeper.weanMilestones.length-1].litres;
+  if(calf.weanDate){
+    const weanAge = ageInDays(calf.weanDate);
+    const status = weanAge >= weanDeclineDays+1
+      ? 'Fully weaned off milk'
+      : `Weaning — day ${Math.max(weanAge,0)} of ${weanDeclineDays}`;
+    weanSection = `
+      <div class="card">
+        <h2>Weaning</h2>
+        <div class="sub">Started ${fmtDate(calf.weanDate)} · ${status}</div>
+        <div style="margin-top:10px;">
+          <button class="btn btn-outline" style="width:100%;" onclick="cancelWean('${calf.id}')">Cancel weaning</button>
+        </div>
+      </div>`;
+  } else {
+    weanSection = `
+      <div class="card">
+        <h2>Weaning</h2>
+        <p class="muted">Starts a ${weanDeclineDays}-day decline from ${weanFromL}L down to ${weanToL}L, then off milk entirely. Trigger this based on weight, not age.</p>
+        <div style="margin-top:10px;">
+          <button class="btn btn-primary" style="width:100%;" onclick="startWean('${calf.id}')">Start weaning</button>
+        </div>
+      </div>`;
+  }
+
+  resultEl.innerHTML = `
+    <div class="mob-card keeper">
+      <div class="label">Tag #${calf.tag} · ${calf.farm}</div>
+      <div class="amount" style="font-size:22px;">${shedName(calf.shed)}</div>
+      <div class="sub">Born ${fmtDate(calf.birthDate)} · ${age} day${age===1?'':'s'} old</div>
+      <div class="sub">Today's feed: ${today}</div>
+    </div>
+    ${deaths.length ? `<div class="card" style="border-color:var(--danger);"><strong style="color:var(--danger);">Deceased</strong> — ${deaths[0].reason} on ${fmtDate(deaths[0].date)}</div>` : ''}
+    ${treatments.length ? `<div class="card"><h2>Treatment history</h2>${treatments.map(t=>`<div class="list-item"><span>${t.treatmentType}</span><span class="meta">${fmtDate(t.startDate)}</span></div>`).join('')}</div>` : ''}
+    ${weanSection}
+    <div class="card">
+      <h2>Note</h2>
+      <textarea id="noteInput-${calf.id}" maxlength="300" placeholder="e.g. slow to feed, watch closely">${note}</textarea>
+      <div class="muted" id="noteCount-${calf.id}" style="margin-top:4px;">${note.length}/300</div>
+      <div style="margin-top:10px;">
+        <button class="btn btn-primary" onclick="saveNote('${calf.id}')">Save note</button>
+      </div>
+    </div>
+  `;
+  const ta = document.getElementById('noteInput-'+calf.id);
+  if(ta){
+    ta.addEventListener('input', ()=>{
+      document.getElementById('noteCount-'+calf.id).textContent = ta.value.length+'/300';
+    });
+  }
+}
+function saveNote(calfId){
+  const ta = document.getElementById('noteInput-'+calfId);
+  db.collection('calves').doc(calfId).update({note: ta.value.trim()})
+    .then(()=>toast('Note saved'))
+    .catch(err=>toast('Error: '+err.message));
+}
+function startWean(calfId){
+  const wm = CONFIG.keeper.weanMilestones;
+  const days = wm[wm.length-1].day;
+  const fromL = wm[0].litres;
+  const toL = wm[wm.length-1].litres;
+  if(!confirm(`Start weaning? This begins a ${days}-day decline from ${fromL}L to ${toL}L, then off milk.`)) return;
+  db.collection('calves').doc(calfId).update({weanDate: todayStr()})
+    .then(()=>toast('Weaning started'))
+    .catch(err=>toast('Error: '+err.message));
+}
+function cancelWean(calfId){
+  if(!confirm('Cancel weaning? This calf will go back to its normal feed rate.')) return;
+  db.collection('calves').doc(calfId).update({weanDate: null})
+    .then(()=>toast('Weaning cancelled'))
+    .catch(err=>toast('Error: '+err.message));
+}
+
+/* ============ CLIPBOARD ============ */
+function copyText(text){
+  navigator.clipboard.writeText(text).then(()=>{
+    toast('Copied to clipboard');
+  }).catch(()=>{
+    const ta=document.createElement('textarea');
+    ta.value=text; document.body.appendChild(ta); ta.select();
+    try{ document.execCommand('copy'); toast('Copied to clipboard'); }
+    catch(e){ toast('Could not copy — select the text manually'); }
+    document.body.removeChild(ta);
+  });
+}
+
+/* ============ SUMMARY GENERATORS (plain text, no markdown, for pasting into a chat) ============ */
+function genMilkSummary(){
+  const today = todayStr();
+  const lines = [];
+  lines.push('Milk requirements - '+fmtDate(today));
+  lines.push('');
+  lines.push('Keepers');
+  let keeperHead=0, keeperLitres=0;
+  CONFIG.sheds.forEach(s=>{
+    const shedCalves = DATA.calves.filter(c=>c.type==='keeper' && c.shed===s && ageInDays(c.birthDate,today)>=0);
+    const l = shedCalves.reduce((sum,c)=>sum+litresForCalf(c,today),0);
+    keeperHead += shedCalves.length; keeperLitres += l;
+    lines.push(shedName(s)+' - '+shedCalves.length+' head - '+fmtKeeper(l));
+  });
+  lines.push('Keeper total - '+keeperHead+' head - '+fmtKeeper(keeperLitres));
+  lines.push('');
+  const bobbies = DATA.calves.filter(c=>c.type==='bobby' && (!c.cleared || c.clearedDate===today) && ageInDays(c.birthDate,today)>=0);
+  const bobbyLitres = bobbies.reduce((s,c)=>s+litresForCalf(c,today),0);
+  lines.push('Bobbies - '+bobbies.length+' head - '+fmtLitres(bobbyLitres));
+  const herefords = DATA.calves.filter(c=>c.type==='hereford' && ageInDays(c.moveDate,today)>=0);
+  const herefordLitres = herefords.reduce((s,c)=>s+litresForCalf(c,today),0);
+  lines.push('Hereford mob - '+herefords.length+' head - '+fmtLitres(herefordLitres));
+  lines.push('');
+  lines.push('Grand total - '+(keeperHead+bobbies.length+herefords.length)+' head - '+fmtLitres(keeperLitres+bobbyLitres+herefordLitres));
+  return lines.join('\n');
+}
+
+function genCalfTotals(){
+  const today = todayStr();
+  const bornToday = DATA.calves.filter(c=>c.birthDate===today);
+  const allKeepers = DATA.calves.filter(c=>c.type==='keeper');
+  const d1 = allKeepers.filter(c=>c.farm==='D1').length;
+  const d2 = allKeepers.filter(c=>c.farm==='D2').length;
+  const allBobbies = DATA.calves.filter(c=>c.type==='bobby').length;
+  const bobbyD1 = DATA.calves.filter(c=>c.type==='bobby' && c.farm==='D1').length;
+  const bobbyD2 = DATA.calves.filter(c=>c.type==='bobby' && c.farm==='D2').length;
+  const bobbyHF = DATA.calves.filter(c=>c.type==='bobby' && c.farm==='HF').length;
+  const allHerefords = DATA.calves.filter(c=>c.type==='hereford').length;
+  const movedToday = DATA.calves.filter(c=>c.type==='hereford' && c.moveDate===today).length;
+  const activeKeepers = allKeepers.filter(c=>ageInDays(c.birthDate,today)>=0).length;
+  const activeBobbies = DATA.calves.filter(c=>c.type==='bobby' && (!c.cleared || c.clearedDate===today)).length;
+  const activeHerefords = DATA.calves.filter(c=>c.type==='hereford' && ageInDays(c.moveDate,today)>=0).length;
+
+  const lines = [];
+  lines.push('Calf totals - '+fmtDate(today));
+  lines.push('');
+  lines.push('Born today');
+  lines.push('Keepers - '+bornToday.filter(c=>c.type==='keeper').length);
+  lines.push('Bobbies - '+bornToday.filter(c=>c.type==='bobby').length);
+  lines.push('Moved to Hereford mob today - '+movedToday);
+  lines.push('');
+  lines.push('Season totals');
+  lines.push('Keepers - '+allKeepers.length+' (D1 '+d1+', D2 '+d2+')');
+  lines.push('Bobbies (current) - '+allBobbies+' (D1 '+bobbyD1+', D2 '+bobbyD2+', Hereford '+bobbyHF+')');
+  lines.push('Hereford mob (all time) - '+allHerefords);
+  lines.push('Deaths - '+DATA.deaths.length);
+  lines.push('');
+  lines.push('Currently on farm');
+  lines.push('Keepers - '+activeKeepers);
+  lines.push('Bobbies - '+activeBobbies);
+  lines.push('Hereford mob - '+activeHerefords);
+  return lines.join('\n');
+}
+
+function genTreatmentSummary(){
+  const today = todayStr();
+  const active = DATA.treatments.filter(t=>{
+    const start = new Date(t.startDate+'T00:00:00');
+    const end = new Date(start.getTime()+(t.days-1)*86400000);
+    const now = new Date(today+'T00:00:00');
+    return now>=start && now<=end && t.tags.length>0;
+  });
+  const lines = ['Treatments due - '+fmtDate(today), ''];
+  if(active.length===0){
+    lines.push('No treatments due today.');
+  } else {
+    active.forEach(t=>{
+      const dayNum = ageInDays(t.startDate)+1;
+      lines.push(t.treatmentType+' - day '+dayNum+' of '+t.days);
+      lines.push(t.tags.join(', '));
+      lines.push('');
+    });
+  }
+  return lines.join('\n').trim();
+}
+
+function genDeathSummary(){
+  const today = todayStr();
+  const cutoff = new Date(today+'T00:00:00').getTime() - 14*86400000;
+  const recent = DATA.deaths.filter(d=> new Date(d.date+'T00:00:00').getTime() >= cutoff);
+  const lines = ['Death register - '+fmtDate(today), ''];
+  if(recent.length===0){
+    lines.push('No deaths in the last 14 days.');
+  } else {
+    recent.slice().reverse().forEach(d=>{
+      lines.push(d.tag+' - '+fmtDate(d.date)+' - '+d.reason);
+    });
+  }
+  lines.push('');
+  lines.push('Total deaths this season - '+DATA.deaths.length);
+  return lines.join('\n');
+}
+
+/* ============ BACKUP EXPORT / IMPORT ============ */
+function exportData(){
+  return 'CALF_IMPORT:'+JSON.stringify(DATA);
+}
+function doExport(){
+  window.__exportCode = exportData();
+  document.getElementById('exportBox').innerHTML = `
+    <textarea readonly style="min-height:100px;margin-top:10px;">${window.__exportCode}</textarea>
+    <div style="margin-top:8px;"><button class="btn btn-amber" style="width:100%;" onclick="copyText(window.__exportCode)">Copy code</button></div>`;
+}
+
+// Firestore batches cap at 500 operations — chunk to stay safely under that.
+async function commitOpsInChunks(ops){
+  const CHUNK = 400;
+  for(let i=0; i<ops.length; i+=CHUNK){
+    const batch = db.batch();
+    ops.slice(i, i+CHUNK).forEach(op=>op(batch));
+    await batch.commit();
+  }
+}
+
+async function importData(text){
+  text = (text||'').trim();
+  if(!text.startsWith('CALF_IMPORT:')){ toast('Not a valid CALF_IMPORT code'); return; }
+  let parsed;
+  try{ parsed = JSON.parse(text.slice('CALF_IMPORT:'.length)); }
+  catch(e){ toast('Could not read that code'); return; }
+  if(!parsed.calves || !parsed.treatments || !parsed.deaths){ toast('Missing expected data'); return; }
+  if(!confirm('This replaces ALL data for EVERYONE using this app right now — not just this device — and can\'t be undone. Continue?')) return;
+
+  toast('Importing — this may take a moment...');
+  try{
+    const collections = ['calves','treatments','deaths','pushList'];
+    const deleteOps = [];
+    for(const colName of collections){
+      const snap = await db.collection(colName).get();
+      snap.forEach(doc=>{ deleteOps.push(batch=>batch.delete(doc.ref)); });
+    }
+    await commitOpsInChunks(deleteOps);
+
+    const createOps = [];
+    (parsed.calves||[]).forEach(c=>{
+      const id = c.id || uid();
+      const data = {...c}; delete data.id;
+      createOps.push(batch=>batch.set(db.collection('calves').doc(id), data));
+    });
+    (parsed.treatments||[]).forEach(t=>{
+      const id = t.id || uid();
+      const data = {...t}; delete data.id;
+      createOps.push(batch=>batch.set(db.collection('treatments').doc(id), data));
+    });
+    (parsed.deaths||[]).forEach(d=>{
+      const id = d.id || uid();
+      const data = {...d}; delete data.id;
+      createOps.push(batch=>batch.set(db.collection('deaths').doc(id), data));
+    });
+    (parsed.pushList||[]).forEach(p=>{
+      const id = p.id || uid();
+      const data = {...p}; delete data.id;
+      createOps.push(batch=>batch.set(db.collection('pushList').doc(id), data));
+    });
+    createOps.push(batch=>batch.set(db.collection('meta').doc('settings'), {
+      unit: parsed.unit || 'L',
+      lastShed: parsed.lastShed || 1,
+      lastBobbyPen: parsed.lastBobbyPen || 1
+    }));
+    await commitOpsInChunks(createOps);
+    toast('Data imported');
+  }catch(err){
+    toast('Import failed: '+err.message);
+  }
+}
+
+/* ============ RENDER: SHARE ============ */
+function renderShare(){
+  const el = document.getElementById('screen-share');
+  el.innerHTML = `
+    <div class="card">
+      <h2>Milk requirements</h2>
+      <textarea readonly style="min-height:170px;">${genMilkSummary()}</textarea>
+      <div style="margin-top:10px;"><button class="btn btn-amber" style="width:100%;" onclick="copyText(genMilkSummary())">Copy summary</button></div>
+    </div>
+    <div class="card">
+      <h2>Calf totals</h2>
+      <textarea readonly style="min-height:190px;">${genCalfTotals()}</textarea>
+      <div style="margin-top:10px;"><button class="btn btn-amber" style="width:100%;" onclick="copyText(genCalfTotals())">Copy summary</button></div>
+    </div>
+    <div class="card">
+      <h2>Treatment register</h2>
+      <textarea readonly style="min-height:140px;">${genTreatmentSummary()}</textarea>
+      <div style="margin-top:10px;"><button class="btn btn-amber" style="width:100%;" onclick="copyText(genTreatmentSummary())">Copy summary</button></div>
+    </div>
+    <div class="card">
+      <h2>Death register</h2>
+      <textarea readonly style="min-height:120px;">${genDeathSummary()}</textarea>
+      <div style="margin-top:10px;"><button class="btn btn-amber" style="width:100%;" onclick="copyText(genDeathSummary())">Copy summary</button></div>
+    </div>
+    <div class="card">
+      <h2>Full backup</h2>
+      <p class="muted">Generate a code to save somewhere safe (e.g. send to yourself), or paste one back in to restore data on this device.</p>
+      <button class="btn btn-outline" style="width:100%;" onclick="doExport()">Generate export code</button>
+      <div id="exportBox"></div>
+      <label style="margin-top:16px;">Restore from a code</label>
+      <textarea id="importInput" placeholder="Paste a CALF_IMPORT code here"></textarea>
+      <div style="margin-top:10px;"><button class="btn btn-outline" style="width:100%;" onclick="importData(document.getElementById('importInput').value)">Import & replace data</button></div>
+    </div>
+  `;
+}
+
+/* ============ RENDER: BOBBY PENS ============ */
+function activeBobbiesQuery(pen, farm){
+  return DATA.calves.filter(c=>c.type==='bobby' && !c.cleared && (pen===undefined || c.pen===pen) && (!farm || c.farm===farm));
+}
+
+/* Groups the active bobbies in a pen+farm by birth date, so calves that arrived
+   via a transfer (and are therefore a different age to the rest) show up as
+   their own group rather than being blended into a single count. */
+function bobbyGroups(pen, farm){
+  const list = DATA.calves.filter(c=>c.type==='bobby' && !c.cleared && c.pen===pen && c.farm===farm);
+  const map = {};
+  list.forEach(c=>{ (map[c.birthDate] = map[c.birthDate] || []).push(c); });
+  const groups = Object.keys(map).map(bd=>({ birthDate: bd, age: ageInDays(bd), count: map[bd].length }));
+  groups.sort((a,b)=> b.count-a.count || a.age-b.age); // largest cohort first
+  return groups;
+}
+
+let groupActionState = {}; // key "pen|farm|birthDate" -> 'clear' | 'transfer' | null
+function groupKey(pen,farm,birthDate){ return pen+'|'+farm+'|'+birthDate; }
+function toggleGroupAction(key, action){
+  groupActionState[key] = (groupActionState[key]===action) ? null : action;
+  renderBobbies();
+}
+
+function renderGroupRow(pen, farm, group, isOutlier){
+  const key = groupKey(pen, farm, group.birthDate);
+  const state = groupActionState[key];
+  const farmLabel = CONFIG.bobbyFarms[farm] || farm;
+  let form = '';
+  if(state === 'clear'){
+    form = `
+      <div style="margin-top:8px;">
+        <label>How many leaving?</label>
+        <input type="number" id="gqty-${key}" min="1" max="${group.count}" value="${group.count}">
+        <div class="btn-row" style="margin-top:8px;">
+          <button class="btn btn-sm btn-primary" onclick="confirmGroupClear(${pen},'${farm}','${group.birthDate}')">Confirm clear</button>
+          <button class="btn btn-sm btn-outline" onclick="toggleGroupAction('${key}',null)">Cancel</button>
+        </div>
+      </div>`;
+  } else if(state === 'transfer'){
+    form = `
+      <div style="margin-top:8px;">
+        <label>How many transferring?</label>
+        <input type="number" id="gqty-${key}" min="1" max="${group.count}" value="${group.count}">
+        <label>To</label>
+        <select id="gdest-${key}">
+          ${CONFIG.bobbyPens.filter(x=>x!==pen).map(x=>`<option value="${x}">Pen ${x}</option>`).join('')}
+          ${farm==='HF' ? `<option value="hereford-mob">Move to Hereford mob (7L/day)</option>` : ''}
+        </select>
+        <div class="btn-row" style="margin-top:8px;">
+          <button class="btn btn-sm btn-primary" onclick="confirmGroupTransfer(${pen},'${farm}','${group.birthDate}')">Confirm transfer</button>
+          <button class="btn btn-sm btn-outline" onclick="toggleGroupAction('${key}',null)">Cancel</button>
+        </div>
+      </div>`;
+  } else if(state === 'reclassify'){
+    const otherFarms = Object.keys(CONFIG.bobbyFarms).filter(f=>f!==farm);
+    form = `
+      <div style="margin-top:8px;">
+        <label>How many reclassifying?</label>
+        <input type="number" id="rqty-${key}" min="1" max="${group.count}" value="${group.count}">
+        <label>Reclassify as</label>
+        <select id="rdest-${key}">
+          ${otherFarms.map(f=>`<option value="${f}">${CONFIG.bobbyFarms[f]}</option>`).join('')}
+        </select>
+        <div class="muted" style="margin-top:6px;">Stays in this pen on ${CONFIG.bobby.fullL}L — this only fixes the classification, it doesn't move them anywhere.</div>
+        <div class="btn-row" style="margin-top:10px;">
+          <button class="btn btn-sm btn-primary" onclick="confirmReclassify(${pen},'${farm}','${group.birthDate}')">Confirm reclassify</button>
+          <button class="btn btn-sm btn-outline" onclick="toggleGroupAction('${key}',null)">Cancel</button>
+        </div>
+      </div>`;
+  }
+  return `
+    <div style="border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-top:6px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:13px;font-weight:600;">${farmLabel} · ${group.age} day${group.age===1?'':'s'} old${isOutlier?' ⚠':''}</span>
+        <span style="font-size:13px;">${group.count} head</span>
+      </div>
+      ${isOutlier ? `<div class="muted" style="margin-top:2px;">Different age to the rest of this pen — likely a transfer or hold-back.</div>` : ''}
+      <div class="btn-row" style="margin-top:6px;gap:6px;">
+        <button class="btn btn-sm btn-outline" onclick="toggleGroupAction('${key}','clear')">${state==='clear'?'Close':'Clear'}</button>
+        <button class="btn btn-sm btn-outline" onclick="toggleGroupAction('${key}','transfer')">${state==='transfer'?'Close':'Transfer'}</button>
+        <button class="btn btn-sm btn-outline" onclick="toggleGroupAction('${key}','reclassify')">${state==='reclassify'?'Close':'Reclassify'}</button>
+      </div>
+      ${form}
+    </div>`;
+}
+
+function confirmReclassify(pen, farm, birthDate){
+  const key = groupKey(pen, farm, birthDate);
+  const list = DATA.calves.filter(c=>c.type==='bobby' && !c.cleared && c.pen===pen && c.farm===farm && c.birthDate===birthDate);
+  if(list.length===0){ toast('Nothing to reclassify'); groupActionState[key]=null; renderBobbies(); return; }
+  const input = document.getElementById('rqty-'+key);
+  const destSelect = document.getElementById('rdest-'+key);
+  let qty = parseInt(input.value,10);
+  if(isNaN(qty) || qty<0) qty = 0;
+  if(qty>list.length) qty = list.length;
+  const newFarm = destSelect.value;
+  const batch = db.batch();
+  for(let i=0;i<qty;i++){ batch.update(db.collection('calves').doc(list[i].id), {farm: newFarm}); }
+  batch.commit().then(()=>{
+    toast(`${qty} reclassified as ${CONFIG.bobbyFarms[newFarm]}`);
+  }).catch(err=>toast('Error: '+err.message));
+  groupActionState[key] = null;
+  renderBobbies();
+}
+
+function renderBobbies(){
+  const el = document.getElementById('screen-bobbies');
+  if(!el) return;
+  const d1Total = activeBobbiesQuery(undefined,'D1').length;
+  const d2Total = activeBobbiesQuery(undefined,'D2').length;
+  const hfTotal = activeBobbiesQuery(undefined,'HF').length;
+  const grandTotal = DATA.calves.filter(c=>c.type==='bobby' && !c.cleared).length;
+
+  let penCards = '';
+  CONFIG.bobbyPens.forEach(p=>{
+    const inPen = activeBobbiesQuery(p);
+    if(inPen.length===0){
+      penCards += `
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;">
+            <h2 style="margin:0;">Pen ${p}</h2>
+            <span style="font-family:'Fraunces',serif;font-size:22px;font-weight:600;">0</span>
+          </div>
+          <div class="muted" style="margin-top:6px;">Empty</div>
+        </div>`;
+      return;
+    }
+    const oldestAge = Math.max(...inPen.map(c=>ageInDays(c.birthDate)));
+    const overdue = oldestAge >= CONFIG.bobby.overdueDays;
+
+    let rows = '';
+    ['D1','D2','HF'].forEach(farm=>{
+      const groups = bobbyGroups(p, farm);
+      groups.forEach((g,i)=>{
+        rows += renderGroupRow(p, farm, g, groups.length>1 && i>0);
+      });
+    });
+
+    penCards += `
+      <div class="card" style="${overdue?'border-color:var(--danger);':''}">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;">
+          <h2 style="margin:0;">Pen ${p}</h2>
+          <span style="font-family:'Fraunces',serif;font-size:22px;font-weight:600;">${inPen.length}</span>
+        </div>
+        <div class="muted" style="margin-top:4px;">Oldest ${oldestAge} day${oldestAge===1?'':'s'}${overdue?' · overdue for transport':''}</div>
+        ${rows}
+      </div>`;
+  });
+
+  el.innerHTML = `
+    <div class="grand-total" style="margin-bottom:14px;">
+      <span>Active bobbies</span>
+      <span class="amount">${grandTotal}</span>
+    </div>
+    <div class="card">
+      <div class="muted">D1: ${d1Total} &nbsp;·&nbsp; D2: ${d2Total} &nbsp;·&nbsp; Hereford: ${hfTotal}</div>
+    </div>
+    ${penCards}
+  `;
+}
+
+function confirmGroupClear(pen, farm, birthDate){
+  const key = groupKey(pen, farm, birthDate);
+  const list = DATA.calves.filter(c=>c.type==='bobby' && !c.cleared && c.pen===pen && c.farm===farm && c.birthDate===birthDate);
+  if(list.length===0){ toast('Nothing to clear'); groupActionState[key]=null; renderBobbies(); return; }
+  const input = document.getElementById('gqty-'+key);
+  let qty = parseInt(input.value,10);
+  if(isNaN(qty) || qty<0) qty = 0;
+  if(qty>list.length) qty = list.length;
+  const today = todayStr();
+  const batch = db.batch();
+  for(let i=0;i<qty;i++){ batch.update(db.collection('calves').doc(list[i].id), {cleared:true, clearedDate: today}); }
+  batch.commit().then(()=>{
+    toast(`${qty} cleared from Pen ${pen}`);
+  }).catch(err=>toast('Error: '+err.message));
+  groupActionState[key] = null;
+  renderBobbies();
+}
+
+function confirmGroupTransfer(pen, farm, birthDate){
+  const key = groupKey(pen, farm, birthDate);
+  const list = DATA.calves.filter(c=>c.type==='bobby' && !c.cleared && c.pen===pen && c.farm===farm && c.birthDate===birthDate);
+  if(list.length===0){ toast('Nothing to transfer'); groupActionState[key]=null; renderBobbies(); return; }
+  const input = document.getElementById('gqty-'+key);
+  const destSelect = document.getElementById('gdest-'+key);
+  let qty = parseInt(input.value,10);
+  if(isNaN(qty) || qty<0) qty = 0;
+  if(qty>list.length) qty = list.length;
+  const destVal = destSelect.value;
+  const batch = db.batch();
+
+  if(destVal === 'hereford-mob'){
+    const today = todayStr();
+    for(let i=0;i<qty;i++){
+      batch.update(db.collection('calves').doc(list[i].id), {type:'hereford', moveDate: today, pen: null});
+    }
+    batch.commit().then(()=>{
+      toast(`${qty} moved to the Hereford mob`);
+    }).catch(err=>toast('Error: '+err.message));
+  } else {
+    const dest = parseInt(destVal,10);
+    for(let i=0;i<qty;i++){ batch.update(db.collection('calves').doc(list[i].id), {pen: dest}); }
+    batch.commit().then(()=>{
+      toast(`${qty} transferred from Pen ${pen} to Pen ${dest}`);
+    }).catch(err=>toast('Error: '+err.message));
+  }
+  groupActionState[key] = null;
+  renderBobbies();
+}
+
+/* ============ RENDER: PUSH REGISTER ============ */
+let pushBuildState = { shed:null, farm:null, selectedTags:new Set() };
+
+function pickPushShed(s){ pushBuildState.shed=s; pushBuildState.farm=null; pushBuildState.selectedTags=new Set(); renderPush(); }
+function pickPushFarm(f){ pushBuildState.farm=f; pushBuildState.selectedTags=new Set(); renderPush(); }
+function togglePushTag(t){
+  if(pushBuildState.selectedTags.has(t)) pushBuildState.selectedTags.delete(t);
+  else pushBuildState.selectedTags.add(t);
+  renderPush();
+}
+function addToPushList(){
+  if(pushBuildState.selectedTags.size===0) return;
+  const count = pushBuildState.selectedTags.size;
+  const batch = db.batch();
+  pushBuildState.selectedTags.forEach(t=>{
+    const ref = db.collection('pushList').doc(uid());
+    batch.set(ref, { tag:t, shed: pushBuildState.shed, farm: pushBuildState.farm, pushed:false });
+  });
+  batch.commit().then(()=>{
+    toast(`${count} added to the pushing list`);
+  }).catch(err=>toast('Error: '+err.message));
+  pushBuildState.selectedTags = new Set();
+  renderPush();
+}
+function togglePushed(id){
+  const item = DATA.pushList.find(p=>p.id===id);
+  if(!item) return;
+  db.collection('pushList').doc(id).update({pushed: !item.pushed}).catch(err=>toast('Error: '+err.message));
+}
+let pushClearConfirming = false;
+function clearPushList(){
+  if(DATA.pushList.length===0) return;
+  pushClearConfirming = true;
+  renderPush();
+}
+function confirmClearPushList(){
+  const batch = db.batch();
+  DATA.pushList.forEach(p=>{ batch.delete(db.collection('pushList').doc(p.id)); });
+  batch.commit().then(()=>{
+    toast('Pushing list cleared');
+  }).catch(err=>toast('Error: '+err.message));
+  pushClearConfirming = false;
+  renderPush();
+}
+function cancelClearPushList(){
+  pushClearConfirming = false;
+  renderPush();
+}
+function copyPushList(){
+  const lines = ['Pushing list - '+fmtDate(todayStr()), ''];
+  let any = false;
+  CONFIG.sheds.forEach(s=>{
+    const items = DATA.pushList.filter(p=>p.shed===s && !p.pushed);
+    if(items.length===0) return;
+    any = true;
+    lines.push(shedName(s));
+    lines.push(items.map(p=>p.tag).join(', '));
+    lines.push('');
+  });
+  if(!any){ toast('Nothing left to push — everything on the list is already done'); return; }
+  copyText(lines.join('\n').trim());
+}
+
+function renderPush(){
+  const el = document.getElementById('screen-push');
+  if(!el) return;
+  const shed = pushBuildState.shed;
+  const farm = pushBuildState.farm;
+  const today = todayStr();
+
+  let addSection = `
+    <div class="card">
+      <h2>Add to pushing list</h2>
+      <label>Shed</label>
+      <div class="shed-picker">
+        ${CONFIG.sheds.map(s=>`<button class="${shed===s?'selected':''}" onclick="pickPushShed(${s})">${shedName(s)}</button>`).join('')}
+      </div>`;
+
+  if(shed){
+    addSection += `
+      <label>Farm</label>
+      <div class="farm-picker">
+        <button class="${farm==='D1'?'selected':''}" onclick="pickPushFarm('D1')">D1</button>
+        <button class="${farm==='D2'?'selected':''}" onclick="pickPushFarm('D2')">D2</button>
+      </div>`;
+  }
+
+  if(shed && farm){
+    const alreadyOnList = new Set(DATA.pushList.filter(p=>!p.pushed && p.shed===shed && p.farm===farm).map(p=>p.tag));
+    const candidates = DATA.calves.filter(c=>c.type==='keeper' && c.shed===shed && c.farm===farm
+      && ageInDays(c.birthDate,today) >= 0 && litresForCalf(c,today) > 0
+      && !alreadyOnList.has(c.tag));
+    candidates.sort((a,b)=>a.tag-b.tag);
+    addSection += `
+      <label>Tap tag numbers (${pushBuildState.selectedTags.size} selected)</label>
+      <div class="tag-grid">
+        ${candidates.length ? candidates.map(c=>`<div class="tag-chip ${pushBuildState.selectedTags.has(c.tag)?'selected':''}" onclick="togglePushTag(${c.tag})">${c.tag}</div>`).join('') : '<div class="empty">No tags available — everything active here is already on the list.</div>'}
+      </div>
+      <div style="margin-top:14px;">
+        <button class="btn btn-primary" onclick="addToPushList()" ${pushBuildState.selectedTags.size===0?'disabled':''}>Add ${pushBuildState.selectedTags.size||''} to list</button>
+      </div>`;
+  }
+  addSection += `</div>`;
+
+  const total = DATA.pushList.length;
+  const remaining = DATA.pushList.filter(p=>!p.pushed).length;
+
+  let listSection = `<div class="card"><h2>Pushing list ${total>0?`(${remaining} of ${total} remaining)`:''}</h2>`;
+  if(total===0){
+    listSection += `<div class="empty">No calves on the list yet.</div>`;
+  } else {
+    CONFIG.sheds.forEach(s=>{
+      const items = DATA.pushList.filter(p=>p.shed===s);
+      if(items.length===0) return;
+      listSection += `<div class="muted" style="margin-top:10px;font-weight:700;">${shedName(s)}</div><div class="tag-list" style="margin-top:6px;">`;
+      items.forEach(p=>{
+        listSection += `<span style="cursor:pointer;${p.pushed?'text-decoration:line-through;opacity:.5;':''}" onclick="togglePushed('${p.id}')">${p.tag}</span>`;
+      });
+      listSection += `</div>`;
+    });
+    listSection += `
+      <div class="btn-row" style="margin-top:14px;">
+        <button class="btn btn-amber" onclick="copyPushList()">Copy list</button>
+        <button class="btn btn-danger" onclick="clearPushList()">Clear list</button>
+      </div>
+      <div class="muted" style="margin-top:8px;">Tap a tag in the list to cross it off as it's done. Copy list only sends the ones not yet crossed off.</div>
+      ${pushClearConfirming ? `
+        <div style="margin-top:10px;padding-top:10px;border-top:1px dashed var(--line);">
+          <div class="muted" style="margin-bottom:8px;">Clear the whole list? This can't be undone.</div>
+          <div class="btn-row">
+            <button class="btn btn-sm btn-danger" onclick="confirmClearPushList()">Yes, clear it</button>
+            <button class="btn btn-sm btn-outline" onclick="cancelClearPushList()">Cancel</button>
+          </div>
+        </div>` : ''}`;
+  }
+  listSection += `</div>`;
+
+  el.innerHTML = addSection + listSection;
+}
+
+/* ============ RENDER ALL ============ */
+function renderAll(){
+  renderToday();
+  renderBirths();
+  renderBobbies();
+  renderPush();
+  renderTreatments();
+  renderDeaths();
+  renderLookup();
+  renderShare();
+}
 </script>
 </body>
 </html>
