@@ -503,13 +503,15 @@ function renderToday(){
   const overdueCount = bobbies.filter(c=>ageInDays(c.birthDate,today) >= CONFIG.bobby.overdueDays).length;
 
   // Herd summary (always visible)
+  // Note: internally "age" counts from 0 (birth day = age 0), but the farm counts
+  // the birth day as "day 1" — so their "day 5" (departure morning) is age 4, not 5.
   const keepersD1 = keepers.filter(c=>c.farm==='D1').length;
   const keepersD2 = keepers.filter(c=>c.farm==='D2').length;
   const deathsTotal = DATA.deaths.length;
-  const day4D1 = bobbies.filter(c=>c.farm==='D1' && ageInDays(c.birthDate,today)===4).length;
-  const day4D2 = bobbies.filter(c=>c.farm==='D2' && ageInDays(c.birthDate,today)===4).length;
-  const day5D1 = bobbies.filter(c=>c.farm==='D1' && ageInDays(c.birthDate,today)===5).length;
-  const day5D2 = bobbies.filter(c=>c.farm==='D2' && ageInDays(c.birthDate,today)===5).length;
+  const day4D1 = bobbies.filter(c=>c.farm==='D1' && ageInDays(c.birthDate,today)===3).length;
+  const day4D2 = bobbies.filter(c=>c.farm==='D2' && ageInDays(c.birthDate,today)===3).length;
+  const day5D1 = bobbies.filter(c=>c.farm==='D1' && ageInDays(c.birthDate,today)===4).length;
+  const day5D2 = bobbies.filter(c=>c.farm==='D2' && ageInDays(c.birthDate,today)===4).length;
 
   el.innerHTML = `
     <div class="card">
@@ -1260,7 +1262,7 @@ function renderGroupRow(pen, farm, group, isOutlier){
   return `
     <div style="border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-top:6px;">
       <div style="display:flex;justify-content:space-between;align-items:center;">
-        <span style="font-size:13px;font-weight:600;">${farmLabel} · ${group.age} day${group.age===1?'':'s'} old${isOutlier?' ⚠':''}</span>
+        <span style="font-size:13px;font-weight:600;">${farmLabel} · day ${group.age+1}${isOutlier?' ⚠':''}</span>
         <span style="font-size:13px;">${group.count} head</span>
       </div>
       ${isOutlier ? `<div class="muted" style="margin-top:2px;">Different age to the rest of this pen — likely a transfer or hold-back.</div>` : ''}
@@ -1331,7 +1333,7 @@ function renderBobbies(){
           <h2 style="margin:0;">Pen ${p}</h2>
           <span style="font-family:'Fraunces',serif;font-size:22px;font-weight:600;">${inPen.length}</span>
         </div>
-        <div class="muted" style="margin-top:4px;">Oldest ${oldestAge} day${oldestAge===1?'':'s'}${overdue?' · overdue for transport':''}</div>
+        <div class="muted" style="margin-top:4px;">Oldest is on day ${oldestAge+1}${overdue?' · overdue for transport':''}</div>
         ${rows}
       </div>`;
   });
