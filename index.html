@@ -40,9 +40,10 @@
   *{box-sizing:border-box;}
   body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:'Inter',system-ui,sans-serif;-webkit-tap-highlight-color:transparent;}
   h1,h2,h3{font-family:'Fraunces',serif;font-weight:600;margin:0;}
-  .app{max-width:520px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;padding-bottom:78px;}
+  .app{max-width:520px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;}
 
-  header.top{background:var(--forest);color:#F5F1E6;padding:18px 18px 16px;position:sticky;top:0;z-index:10;}
+  .header-wrap{position:sticky;top:0;z-index:20;}
+  header.top{background:var(--forest);color:#F5F1E6;padding:18px 18px 16px;}
   header.top .eyebrow{font-size:11px;letter-spacing:.14em;text-transform:uppercase;opacity:.65;margin-bottom:2px;}
   header.top h1{font-size:22px;color:#fff;}
   header.top .unit-toggle{position:absolute;right:16px;top:18px;display:flex;background:rgba(255,255,255,.12);border-radius:20px;padding:3px;}
@@ -126,11 +127,11 @@
   .tag-list span{background:#fff;border:1px solid var(--line);border-radius:6px;padding:3px 7px;font-size:12px;font-weight:600;}
   .tag-list span button{border:none;background:none;color:var(--danger);cursor:pointer;font-weight:700;margin-left:4px;padding:0;}
 
-  nav.bottom{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--line);display:flex;max-width:520px;margin:0 auto;z-index:20;}
-  nav.bottom button{flex:1;background:none;border:none;padding:8px 1px 10px;font-size:9.5px;font-weight:600;color:var(--ink-soft);cursor:pointer;font-family:'Inter',sans-serif;border-top:2px solid transparent;letter-spacing:0;}
-  nav.bottom button.active{color:var(--forest);border-top:2px solid var(--forest);}
+  nav.top-tabs{display:grid;grid-template-columns:repeat(4,1fr);background:var(--surface);border-bottom:1px solid var(--line);max-width:520px;margin:0 auto;}
+  nav.top-tabs button{background:none;border:none;border-bottom:3px solid transparent;padding:12px 4px;font-size:13px;font-weight:600;color:var(--ink-soft);cursor:pointer;font-family:'Inter',sans-serif;line-height:1.2;}
+  nav.top-tabs button.active{color:var(--forest);border-bottom:3px solid var(--forest);}
 
-  .toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--forest-dark);color:#fff;padding:10px 18px;border-radius:20px;font-size:13px;font-weight:600;z-index:50;opacity:0;pointer-events:none;transition:opacity .2s;}
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--forest-dark);color:#fff;padding:10px 18px;border-radius:20px;font-size:13px;font-weight:600;z-index:50;opacity:0;pointer-events:none;transition:opacity .2s;}
   .toast.show{opacity:1;}
 
   .section-toggle{display:flex;justify-content:space-between;align-items:center;cursor:pointer;}
@@ -163,16 +164,29 @@
   <div id="loginError"></div>
 </div>
 <div class="app" style="display:none;">
-  <header class="top">
-    <div class="eyebrow" id="headerEyebrow">Calf Assistant</div>
-    <h1 id="headerTitle">Today</h1>
-    <button id="logoutBtn" onclick="logout()">Sign out</button>
-    <div class="unit-toggle">
-      <button id="unitL" class="active" onclick="setUnit('L')">L</button>
-      <button id="unitKg" onclick="setUnit('kg')">kg</button>
-    </div>
-    <div style="position:absolute;right:16px;top:46px;font-size:9px;opacity:.55;text-transform:uppercase;letter-spacing:.05em;">keepers only</div>
-  </header>
+  <div class="header-wrap">
+    <header class="top">
+      <div class="eyebrow" id="headerEyebrow">Calf Assistant</div>
+      <h1 id="headerTitle">Today</h1>
+      <button id="logoutBtn" onclick="logout()">Sign out</button>
+      <div class="unit-toggle">
+        <button id="unitL" class="active" onclick="setUnit('L')">L</button>
+        <button id="unitKg" onclick="setUnit('kg')">kg</button>
+      </div>
+      <div style="position:absolute;right:16px;top:46px;font-size:9px;opacity:.55;text-transform:uppercase;letter-spacing:.05em;">keepers only</div>
+    </header>
+
+    <nav class="top-tabs">
+      <button data-screen="today" class="active" onclick="showScreen('today')">Today</button>
+      <button data-screen="births" onclick="showScreen('births')">Births</button>
+      <button data-screen="bobbies" onclick="showScreen('bobbies')">Bobbies</button>
+      <button data-screen="push" onclick="showScreen('push')">Push</button>
+      <button data-screen="treatments" onclick="showScreen('treatments')">Treatments</button>
+      <button data-screen="deaths" onclick="showScreen('deaths')">Deaths</button>
+      <button data-screen="lookup" onclick="showScreen('lookup')">Lookup</button>
+      <button data-screen="share" onclick="showScreen('share')">Share</button>
+    </nav>
+  </div>
 
   <main>
     <!-- TODAY -->
@@ -199,17 +213,6 @@
     <!-- SHARE -->
     <section class="screen" id="screen-share"></section>
   </main>
-
-  <nav class="bottom">
-    <button data-screen="today" class="active" onclick="showScreen('today')">Today</button>
-    <button data-screen="births" onclick="showScreen('births')">Births</button>
-    <button data-screen="bobbies" onclick="showScreen('bobbies')">Bobbies</button>
-    <button data-screen="push" onclick="showScreen('push')">Push</button>
-    <button data-screen="treatments" onclick="showScreen('treatments')">Treatments</button>
-    <button data-screen="deaths" onclick="showScreen('deaths')">Deaths</button>
-    <button data-screen="lookup" onclick="showScreen('lookup')">Lookup</button>
-    <button data-screen="share" onclick="showScreen('share')">Share</button>
-  </nav>
 </div>
 <div class="toast" id="toast"></div>
 
@@ -308,7 +311,7 @@ auth.onAuthStateChanged(async (user)=>{
 
 function setupForRole(){
   const helperOnly = currentRole === 'helper';
-  document.querySelectorAll('nav.bottom button').forEach(btn=>{
+  document.querySelectorAll('nav.top-tabs button').forEach(btn=>{
     btn.style.display = (!helperOnly || btn.dataset.screen === 'push') ? '' : 'none';
   });
   showScreen(helperOnly ? 'push' : 'today');
@@ -467,7 +470,7 @@ function setUnit(u){
 function showScreen(name){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById('screen-'+name).classList.add('active');
-  document.querySelectorAll('nav.bottom button').forEach(b=>b.classList.toggle('active', b.dataset.screen===name));
+  document.querySelectorAll('nav.top-tabs button').forEach(b=>b.classList.toggle('active', b.dataset.screen===name));
   const titles = {today:['Calf Assistant',"Today"], births:['Log a Birth','Record New Calves'], bobbies:['Pens','Bobby Pens'], push:['Keepers','Pushing List'], treatments:['Health Register','Treatments'], deaths:['Records','Death Register'], lookup:['Records','Tag Lookup'], share:['Records','Share & Backup']};
   document.getElementById('headerEyebrow').textContent = titles[name][0];
   document.getElementById('headerTitle').textContent = titles[name][1];
