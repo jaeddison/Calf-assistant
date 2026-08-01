@@ -245,7 +245,7 @@ const CONFIG = {
   tagPools: { D1: {min:1, max:350}, D2: {min:5001, max:5350} },
   sheds: [1,2,3,4],
   shedNames: { 1: 'D2 Big Shed', 2: 'D2 Long Shed', 3: 'D1 Long Shed', 4: 'D1 Big Shed' },
-  bobbyPens: [1,2,3,4,5,6,7,8],
+  bobbyPens: [1,2,3,4,5,6,7,8,9],
   bobbyFarms: { D1: 'D1', D2: 'D2', HF: 'Hereford' }
 };
 function shedName(s){ return CONFIG.shedNames[s] || ('Shed '+s); }
@@ -1209,6 +1209,8 @@ function bobbyGroups(pen, farm){
 }
 
 let groupActionState = {}; // key "pen|farm|birthDate" -> 'clear' | 'transfer' | null
+let pen9Open = false; // Pen 9 is overflow/infrequent use — collapsed by default
+function togglePen9(){ pen9Open = !pen9Open; renderBobbies(); }
 function groupKey(pen,farm,birthDate){ return pen+'|'+farm+'|'+birthDate; }
 function toggleGroupAction(key, action){
   groupActionState[key] = (groupActionState[key]===action) ? null : action;
@@ -1308,11 +1310,27 @@ function renderBobbies(){
   let penCards = '';
   CONFIG.bobbyPens.forEach(p=>{
     const inPen = activeBobbiesQuery(p);
+    const isOverflowPen = p === 9; // used infrequently — collapsed by default
+
+    if(isOverflowPen && !pen9Open){
+      penCards += `
+        <div class="card" style="cursor:pointer;" onclick="togglePen9()">
+          <div class="section-toggle">
+            <h2 style="margin:0;">Pen ${p} <span class="muted" style="font-weight:400;font-size:13px;">(overflow — tap to expand)</span></h2>
+            <span style="display:flex;align-items:center;gap:8px;">
+              <span style="font-family:'Fraunces',serif;font-size:22px;font-weight:600;">${inPen.length}</span>
+              <span class="chev">▾</span>
+            </span>
+          </div>
+        </div>`;
+      return;
+    }
+
     if(inPen.length===0){
       penCards += `
         <div class="card">
-          <div style="display:flex;justify-content:space-between;align-items:baseline;">
-            <h2 style="margin:0;">Pen ${p}</h2>
+          <div style="display:flex;justify-content:space-between;align-items:baseline;${isOverflowPen?'cursor:pointer;':''}" ${isOverflowPen?'onclick="togglePen9()"':''}>
+            <h2 style="margin:0;">Pen ${p}${isOverflowPen?' <span class="muted" style="font-weight:400;font-size:13px;">(tap to collapse)</span>':''}</h2>
             <span style="font-family:'Fraunces',serif;font-size:22px;font-weight:600;">0</span>
           </div>
           <div class="muted" style="margin-top:6px;">Empty</div>
@@ -1332,8 +1350,8 @@ function renderBobbies(){
 
     penCards += `
       <div class="card" style="${overdue?'border-color:var(--danger);':''}">
-        <div style="display:flex;justify-content:space-between;align-items:baseline;">
-          <h2 style="margin:0;">Pen ${p}</h2>
+        <div style="display:flex;justify-content:space-between;align-items:baseline;${isOverflowPen?'cursor:pointer;':''}" ${isOverflowPen?'onclick="togglePen9()"':''}>
+          <h2 style="margin:0;">Pen ${p}${isOverflowPen?' <span class="muted" style="font-weight:400;font-size:13px;">(tap to collapse)</span>':''}</h2>
           <span style="font-family:'Fraunces',serif;font-size:22px;font-weight:600;">${inPen.length}</span>
         </div>
         <div class="muted" style="margin-top:4px;">Oldest is on day ${oldestAge+1}${overdue?' · overdue for transport':''}</div>
