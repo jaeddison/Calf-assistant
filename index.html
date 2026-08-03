@@ -180,11 +180,11 @@
       <button data-screen="today" class="active" onclick="showScreen('today')">Today</button>
       <button data-screen="births" onclick="showScreen('births')">Births</button>
       <button data-screen="bobbies" onclick="showScreen('bobbies')">Bobbies</button>
+      <button data-screen="hereford" onclick="showScreen('hereford')">Hereford</button>
       <button data-screen="push" onclick="showScreen('push')">Push</button>
       <button data-screen="treatments" onclick="showScreen('treatments')">Treatments</button>
       <button data-screen="deaths" onclick="showScreen('deaths')">Deaths</button>
-      <button data-screen="lookup" onclick="showScreen('lookup')">Lookup</button>
-      <button data-screen="share" onclick="showScreen('share')">Share</button>
+      <button data-screen="records" onclick="showScreen('records')">Records</button>
     </nav>
   </div>
 
@@ -201,17 +201,20 @@
     <!-- DEATHS -->
     <section class="screen" id="screen-deaths"></section>
 
-    <!-- LOOKUP -->
-    <section class="screen" id="screen-lookup"></section>
-
     <!-- BOBBIES -->
     <section class="screen" id="screen-bobbies"></section>
+
+    <!-- HEREFORD -->
+    <section class="screen" id="screen-hereford"></section>
 
     <!-- PUSH -->
     <section class="screen" id="screen-push"></section>
 
-    <!-- SHARE -->
-    <section class="screen" id="screen-share"></section>
+    <!-- RECORDS (Lookup + Share combined) -->
+    <section class="screen" id="screen-records">
+      <div id="lookup-container"></div>
+      <div id="share-container"></div>
+    </section>
   </main>
 </div>
 <div class="toast" id="toast"></div>
@@ -471,7 +474,7 @@ function showScreen(name){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById('screen-'+name).classList.add('active');
   document.querySelectorAll('nav.top-tabs button').forEach(b=>b.classList.toggle('active', b.dataset.screen===name));
-  const titles = {today:['Calf Assistant',"Today"], births:['Log a Birth','Record New Calves'], bobbies:['Pens','Bobby Pens'], push:['Keepers','Pushing List'], treatments:['Health Register','Treatments'], deaths:['Records','Death Register'], lookup:['Records','Tag Lookup'], share:['Records','Share & Backup']};
+  const titles = {today:['Calf Assistant',"Today"], births:['Log a Birth','Record New Calves'], bobbies:['Pens','Bobby Pens'], hereford:['Pens','Hereford Mob'], push:['Keepers','Pushing List'], treatments:['Health Register','Treatments'], deaths:['Records','Death Register'], records:['Records','Lookup & Share']};
   document.getElementById('headerEyebrow').textContent = titles[name][0];
   document.getElementById('headerTitle').textContent = titles[name][1];
   renderAll();
@@ -868,7 +871,7 @@ function saveDeath(){
 
 /* ============ RENDER: LOOKUP ============ */
 function renderLookup(){
-  const el = document.getElementById('screen-lookup');
+  const el = document.getElementById('lookup-container');
   el.innerHTML = `
     <div class="card">
       <h2>Find a calf by tag</h2>
@@ -1157,7 +1160,7 @@ async function importData(text){
 
 /* ============ RENDER: SHARE ============ */
 function renderShare(){
-  const el = document.getElementById('screen-share');
+  const el = document.getElementById('share-container');
   el.innerHTML = `
     <div class="card">
       <h2>Milk requirements</h2>
@@ -1420,6 +1423,93 @@ function confirmGroupTransfer(pen, farm, birthDate){
   renderBobbies();
 }
 
+/* ============ RENDER: HEREFORD MOB ============ */
+// Herefords use their own pen system (hpen field: '1'|'2'|'3'|'outside'|null),
+// completely separate from the bobby pens field — different physical location.
+// Newly promoted calves land as unallocated (hpen not set) until assigned.
+const HEREFORD_BUCKETS = [
+  {key:'unallocated', label:'Unallocated'},
+  {key:'1', label:'Pen 1'},
+  {key:'2', label:'Pen 2'},
+  {key:'3', label:'Pen 3'},
+  {key:'outside', label:'Outside'}
+];
+function herefordBucketQuery(bucket){
+  return DATA.calves.filter(c=>c.type==='hereford' && (bucket==='unallocated' ? !c.hpen : c.hpen===bucket));
+}
+let herefordAllocateOpen = {};
+function toggleHerefordAllocate(bucket){
+  herefordAllocateOpen[bucket] = !herefordAllocateOpen[bucket];
+  renderHereford();
+}
+function confirmHerefordAllocate(bucket){
+  const list = herefordBucketQuery(bucket);
+  if(list.length===0){ toast('Nothing to allocate'); herefordAllocateOpen[bucket]=false; renderHereford(); return; }
+  const input = document.getElementById('hqty-'+bucket);
+  const destSelect = document.getElementById('hdest-'+bucket);
+  let qty = parseInt(input.value,10);
+  if(isNaN(qty) || qty<0) qty = 0;
+  if(qty>list.length) qty = list.length;
+  const destVal = destSelect.value;
+  const newHpen = destVal==='unallocated' ? null : destVal;
+  const batch = db.batch();
+  for(let i=0;i<qty;i++){ batch.update(db.collection('calves').doc(list[i].id), {hpen:newHpen}); }
+  batch.commit().then(()=>{
+    const destLabel = HEREFORD_BUCKETS.find(b=>b.key===destVal).label;
+    toast(`${qty} allocated to ${destLabel}`);
+  }).catch(err=>toast('Error: '+err.message));
+  herefordAllocateOpen[bucket] = false;
+  renderAll();
+}
+
+function renderHereford(){
+  const el = document.getElementById('screen-hereford');
+  if(!el) return;
+  const grandTotal = DATA.calves.filter(c=>c.type==='hereford').length;
+
+  let cards = '';
+  HEREFORD_BUCKETS.forEach(b=>{
+    const list = herefordBucketQuery(b.key);
+    const open = herefordAllocateOpen[b.key];
+    const isUnallocated = b.key==='unallocated';
+    const otherBuckets = HEREFORD_BUCKETS.filter(x=>x.key!==b.key);
+    const form = open ? `
+      <div style="margin-top:8px;">
+        <label>How many allocating?</label>
+        <input type="number" id="hqty-${b.key}" min="1" max="${list.length}" value="${list.length}">
+        <label>To</label>
+        <select id="hdest-${b.key}">
+          ${otherBuckets.map(x=>`<option value="${x.key}">${x.label}</option>`).join('')}
+        </select>
+        <div class="btn-row" style="margin-top:8px;">
+          <button class="btn btn-sm btn-primary" onclick="confirmHerefordAllocate('${b.key}')">Confirm</button>
+          <button class="btn btn-sm btn-outline" onclick="toggleHerefordAllocate('${b.key}')">Cancel</button>
+        </div>
+      </div>` : '';
+    cards += `
+      <div class="card" style="${isUnallocated && list.length>0 ? 'border-color:var(--amber);' : ''}">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;">
+          <h2 style="margin:0;">${b.label}</h2>
+          <span style="font-family:'Fraunces',serif;font-size:22px;font-weight:600;">${list.length}</span>
+        </div>
+        ${list.length>0
+          ? `<div class="btn-row" style="margin-top:10px;">
+               <button class="btn btn-sm btn-outline" onclick="toggleHerefordAllocate('${b.key}')">${open?'Close':'Allocate'}</button>
+             </div>`
+          : '<div class="muted" style="margin-top:6px;">Empty</div>'}
+        ${form}
+      </div>`;
+  });
+
+  el.innerHTML = `
+    <div class="grand-total" style="margin-bottom:14px;">
+      <span>Hereford mob</span>
+      <span class="amount">${grandTotal}</span>
+    </div>
+    ${cards}
+  `;
+}
+
 /* ============ RENDER: PUSH REGISTER ============ */
 let pushBuildState = { shed:null, farm:null, selectedTags:new Set() };
 
@@ -1565,6 +1655,7 @@ function renderAll(){
   renderToday();
   renderBirths();
   renderBobbies();
+  renderHereford();
   renderPush();
   renderTreatments();
   renderDeaths();
